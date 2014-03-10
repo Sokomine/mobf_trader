@@ -130,6 +130,7 @@ mobf_trader.show_trader_formspec_item = function( offset_x, offset_y, stack_desc
 
 	local stack = ItemStack( stack_desc );
 	local anz   = stack:get_count();
+	local name  = stack:get_name();
 	local label = '';
 	-- show the label with the amount of item showed only if more than one is sold and the button is large enough
 	if( anz > 1 and size>0.7) then
@@ -139,18 +140,21 @@ mobf_trader.show_trader_formspec_item = function( offset_x, offset_y, stack_desc
 	end
 	
 	-- do not show unknown blocks
-	if( minetest.registered_items[ stack:get_name()] ) then
--- TODO: tatsaechlich besser so?
-if( size>= 1 and false) then
-		return	'item_image['..offset_x..','..offset_y..';'..size..','..size..';'..
-				( stack:get_name() or '?')..']'..
-				label;
-end
+	if( minetest.registered_items[ name ] ) then
 
-		return	'item_image_button['..offset_x..','..offset_y..';'..size..','..size..';'..
-				( stack:get_name() or '?')..';'..
+		if( name=='mobf_trader:money' or name=='mobf_trader:money2') then
+			return 'image_button['..offset_x..','..offset_y..';'..size..','..size..';'..
+				'mobf_trader_money.png;false;true]'..
+				label;
+		else
+			return	'item_image_button['..offset_x..','..offset_y..';'..size..','..size..';'..
+				( name or '?')..';'..
 				prefix..'_'..tostring( nr )..';]'..
 				label;
+--			return	'item_image['..offset_x..','..offset_y..';'..size..','..size..';'..
+--				( name or '?')..']'..
+--				label;
+		end
 	end
 	return '';
 end
@@ -267,14 +271,16 @@ mobf_trader.show_trader_formspec = function( self, player, menu_path, fields )
 		return;
 	end
 
-	-- turn towards the customer
-	self.object:setyaw( mobf_trader.get_face_direction( self.object:getpos(), player:getpos() ));
-
 	local pname = player:get_player_name();
 
 	local npc_id = self.trader_id;
 	if( not( npc_id )) then
 		return;
+	end
+
+	-- turn towards the customer
+	if( self.object and self.object.setyaw ) then
+		self.object:setyaw( mobf_trader.get_face_direction( self.object:getpos(), player:getpos() ));
 	end
 
 	-- which goods does this trader trade?
@@ -292,19 +298,43 @@ mobf_trader.show_trader_formspec = function( self, player, menu_path, fields )
 
 
 	-- indicate to the owner of the trader which fields of the owner's inventory are taken as input fields
-	-- for trade offers
+	-- for new trade offers; for this purpose, colored boxes are drawn around the relevant inventory slots
 	if( (self.trader_owner and self.trader_owner == pname ) and self.trader_typ=='individual') then
 		formspec = formspec..
 			'label[-0.25,6.90;When adding]'..
-			'label[-0.25,7.10;new trade,]'..
+			'label[-0.25,7.10;a new offer,]'..
 			'label[-0.25,7.30;suggest this:]'..
 			'label[1.1,6.5;Sell:]'..
+					'box[0.95,6.7;0.95,4.35;#00AA00]'..
 			'label[2.1,6.5;for:]'..
-			-- the Add button is also shown next to the actual trade offers
-			'button[9,7.1;1,0.5;'..npc_id..'_add;Add]'; 
+					'box[1.95,6.7;0.95,4.35;#0000CC]'..
+			-- the Add button is also shown next to the player's inventory that provides the names
+			'button[9,7.1;1,0.5;'..npc_id..'_add;Add]'..
+			'button[1.1,10.9;3.9,0.5;'..npc_id..'_addm;Add offer based on these colored slots]';
 		for i = 3, mobf_trader.MAX_ALTERNATE_PAYMENTS do
+			local boxcolor = '#0000CC';
 			formspec = formspec..'label['..(tostring(i)+0.1)..',6.5;or:]';
+			-- complex offers of up to 4 items allow only 3 alternate payments
+			if( i<=4 ) then
+				boxcolor = '#0000CC';
+				if(( i%2 )==1 ) then
+					boxcolor = '#AAAAAA';
+				end
+				formspec = formspec..'box['..( i-0.05 )..',6.7;0.95,4.35;'..boxcolor..']';
+			else
+				boxcolor = '#000077';
+				if(( i%2 )==1 ) then
+					boxcolor = '#777777';
+				end
+				formspec = formspec..'box['..( i-0.05 )..',6.7;0.95,1.25;'..boxcolor..']';
+			end
 		end
+	end
+
+
+	-- back to main menu (player clicked 'Abort' in the add/edit new offer menu)
+	if( menu_path and #menu_path > 1 and menu_path[2]=='main') then
+		menu_path[2] = nil;
 	end
 
 
@@ -335,25 +365,35 @@ mobf_trader.show_trader_formspec = function( self, player, menu_path, fields )
 			error_msg = 'Error: What do you want to offer? Please enter something after \'Sell:\'!';
 		end
 		for i=1,mobf_trader.MAX_ALTERNATE_PAYMENTS do
-			local text = fields[ 't'..tostring(i) ];
-			if( text and text ~= '' ) then
-				local help = text:split( ' ' );
-				-- if no amount is given, assume 1
-				if( #help < 2 ) then
-					help[2] = 1;
+			local offer_one_side = {};
+			for j=1,4 do
+				local text = fields[ 't'..tostring(((i-1)*4)+j) ];
+				if( text and text ~= '' ) then
+					local help = text:split( ' ' );
+					-- if no amount is given, assume 1
+					if( #help < 2 ) then
+						help[2] = 1;
+					end
+					-- the amount of items can only be positive
+					help[2] = tonumber( help[2] );
+					if( not( help[2] ) or help[2]<1 ) then
+						error_msg = 'Error: Negative amounts are not supported: \''..( text )..'\'.';
+					end
+					-- money and money2 are acceptable as well
+					if( not( minetest.registered_items[ help[1] ] ) and help[1]~='mobf_trader:money' and help[1]~='mobf_trader:money2') then
+						error_msg = 'Error: \''..tostring( help[1] )..'\' is not a valid item. Please check your spelling.';
+					end
+					if( error_msg == '' ) then
+						table.insert( offer_one_side, text );
+					end
 				end
-				-- the amount of items can only be positive
-				help[2] = tonumber( help[2] );
-				if( not( help[2] ) or help[2]<1 ) then
-					error_msg = 'Error: Negative amounts are not supported: \''..( text )..'\'.';
-				end
-				-- money and money2 are acceptable as well
-				if( not( minetest.registered_items[ help[1] ] ) and help[1]~='mobf_trader:money' and help[1]~='mobf_trader:money2') then
-					error_msg = 'Error: \''..tostring( help[1] )..'\' is not a valid item. Please check your spelling.';
-				end
-				if( error_msg == '' ) then
-					table.insert( offer, text );
-				end
+			end
+			-- use a string to store
+			if(     error_msg == '' and #offer_one_side==1) then
+				table.insert( offer, offer_one_side[1] );
+			-- use a table to store
+			elseif( error_msg == '' and #offer_one_side>1) then
+				table.insert( offer, offer_one_side );
 			end
 		end
 		if( #offer < 2 ) then
@@ -402,7 +442,7 @@ mobf_trader.show_trader_formspec = function( self, player, menu_path, fields )
 					
 		-- changing an existing offer failed; offer to edit it
 		elseif( menu_path[2]=='storechange' ) then
-			menu_path[2] = 'change';
+			menu_path[2] = 'edit';
 			formspec = formspec..
 				'textarea[1.0,0.5;9,1.5;info;;'..minetest.formspec_escape( error_msg  )..']';
 		end
@@ -410,17 +450,17 @@ mobf_trader.show_trader_formspec = function( self, player, menu_path, fields )
 
 
 	-- add a new trade offer for the individual trader
-	if( menu_path and #menu_path > 1 and (menu_path[2]=='add' or menu_path[2]=='edit')) then
+	if( menu_path and #menu_path > 1 and (menu_path[2]=='add' or menu_path[2]=='edit' or menu_path[2]=='addm')) then
 
 		local player_inv = player:get_inventory();
 		local edit_nr    = 0;
 
-		if(     menu_path[2]=='add' ) then
+		if(     menu_path[2]=='add' or menu_path[2]=='addm') then
 			formspec = formspec..
 				'button[0.5,6.3;2,0.5;'..npc_id..'_storenew;Store]'..
-				'button[3.0,6.3;2,0.5;quit;Abort]'..
-				'label[3.0,0.5;Add a new trade offer]'..
-				'textarea[1.0,1.5;9,1.5;info;;'..( minetest.formspec_escape( 
+				'button[3.0,6.3;2,0.5;'..npc_id..'_main;Abort]'..
+				'label[3.0,-0.2;Add a new trade offer]'..
+				'textarea[1.0,0.5;9,1.5;info;;'..( minetest.formspec_escape( 
 					'Plese enter what you want to trade in exchange for what.\n'..
 					'The items in the top row of your inventory serve as sample entries to the fields here.\n'..
 					'Please edit the input fields to suit your needs or abort and re-arrange your inventory so\n'..
@@ -428,9 +468,9 @@ mobf_trader.show_trader_formspec = function( self, player, menu_path, fields )
 		elseif( menu_path[2]=='edit' ) then
 			formspec = formspec..
 				'button_exit[0.5,6.3;2,0.5;'..npc_id..'_storechange_'..menu_path[3]..';Store]'..
-				'button_exit[3.0,6.3;2,0.5;quit;Abort]'..
-				'label[3.0,0.5;Edit trade offer]'..
-				'textarea[1.0,1.5;9,1.5;info;;'..minetest.formspec_escape( 
+				'button_exit[3.0,6.3;2,0.5;'..npc_id..'_main;Abort]'..
+				'label[3.0,-0.2;Edit trade offer]'..
+				'textarea[1.0,1.5;9,0.5;info;;'..minetest.formspec_escape( 
 					'Plese edit this trade offer according to your needs.')..']';
 			edit_nr = tonumber( menu_path[3] );
 			if( not( edit_nr ) or edit_nr < 1 or edit_nr>#trader_goods ) then
@@ -438,34 +478,84 @@ mobf_trader.show_trader_formspec = function( self, player, menu_path, fields )
 			end
 		end
 
+		local texts = {};
+		local extended = false;
+		if( menu_path[2]=='addm' ) then
+			extended = true;
+		end
 		for i=1,mobf_trader.MAX_ALTERNATE_PAYMENTS do
-			local text  = '';
-			local stack = player_inv:get_stack( 'main', i );
+			for j=1,4 do
+				local text  = '';
+
+				-- edit input from previous attempt
+				if( fields and fields[ 't'..tostring((i-1)+j) ] ) then
+					text = fields[ 't'..tostring((i-1)+j) ];
+				-- edit an existing offer
+				elseif( edit_nr and edit_nr > 0 and edit_nr <= #trader_goods ) then
+					if( type( trader_goods[ edit_nr ][i] )=='table' ) then
+						text = ( trader_goods[ edit_nr ][i][j] or '');
+						extended = true;
+					elseif( j==1 ) then
+						text = ( trader_goods[ edit_nr ][i]    or '');
+					else
+						text = '';
+					end
+				-- take what's in the player's inventory as a base
+				else
+					local stack = player_inv:get_stack( 'main', ((j-1)*8)+i );
+
+					if( not( stack:is_empty() )) then
+						text = stack:get_name()..' '..stack:get_count();
+					else
+						text = '';
+					end
+				end
+				table.insert( texts, text );
+			end
+		end
+
+		for i=1,mobf_trader.MAX_ALTERNATE_PAYMENTS do
 			local o     = 0;
 			local ltext = 'or';
-			-- edit input from previous attempt
-			if( fields and fields[ 't'..tostring(i) ] ) then
-				text = fields[ 't'..tostring(i) ];
-			-- edit an existing offer
-			elseif( edit_nr and edit_nr > 0 and edit_nr <= #trader_goods ) then
-				text = ( trader_goods[ edit_nr ][i] or '');
-			-- take what's in the player's inventory as a base
-			elseif( not( stack:is_empty() )) then
-				text = stack:get_name()..' '..stack:get_count();
-			else
-				text = '';
-			end
+			local boxcolor = '#0000CC';
 			-- the 'Sell' is not as far to the right as the rest
 			if(     i==1 ) then
 				o     = -1;
 				ltext = 'Sell';
+				boxcolor = '#00AA00';
 			elseif( i==2 ) then
 				ltext = 'for';
+			elseif( i>1 and (i%2==1)) then
+				boxcolor = '#AAAAAA';
 			end
-			formspec = formspec..
-				'label['..(2.0+o)..','..( 2.5+(i*0.5))..';'..ltext..']'..
-				'field['..(3.1+o)..','..( 2.7+(i*0.5))..';7,1.0;t'..tostring(i)..';;'..
-					minetest.formspec_escape( text )..']';
+			if( extended ) then -- distinguish between simple (one item offered, 1 wanted) and complex (up to 4 offered; up to 4 wanted) trades
+				if( i<5 ) then
+				    formspec = formspec..
+					'label['..(1.0+o)..','..( 1.0+(i*1.1))..';'..ltext..']'..
+					'box['..(  0.8+o)..','..( 0.86+(i*1.1))..';9.1,1.04;'..boxcolor..']'..
+					'field['..(2.1+o)..','..( 1.0+(i*1.1))..';3.9,1.0;t'..tostring((i*4)-3)..';;'..
+						minetest.formspec_escape( texts[ (i*4)-3] )..']'..
+					'field['..(2.1+o)..','..( 1.5+(i*1.1))..';3.9,1.0;t'..tostring((i*4)-2)..';;'..
+						minetest.formspec_escape( texts[ (i*4)-2] )..']'..
+					'field['..(6.2+o)..','..( 1.0+(i*1.1))..';3.9,1.0;t'..tostring((i*4)-1)..';;'..
+						minetest.formspec_escape( texts[ (i*4)-1] )..']'..
+					'field['..(6.2+o)..','..( 1.5+(i*1.1))..';3.9,1.0;t'..tostring((i*4)  )..';;'..
+						minetest.formspec_escape( texts[ (i*4)  ] )..']'..
+					'label['..(5.5+o)..','..( 1.0+(i*1.1))..';and]';
+				end
+			else
+				-- the colors are a bit darker when offering a simple trade
+				if( boxcolor=='#AAAAAA' ) then
+					boxcolor = '#777777';
+				elseif( boxcolor=='#0000CC' ) then
+					boxcolor = '#000077';
+				end
+				formspec = formspec..
+					'label['..(2.0+o)..','..( 2.5+(i*0.5))..';'..ltext..']'..
+					'box['..(  1.8+o)..','..( 2.55+(i*0.5))..';8.1,0.51;'..boxcolor..']'..
+					'field['..(3.1+o)..','..( 2.7+(i*0.5))..';7,1.0;t'..tostring((i*4)-3)..';;'..
+						minetest.formspec_escape( texts[ (i*4)-3 ] )..']';
+			end
 		end
 				
 		minetest.show_formspec( pname, "mobf_trader:trader", formspec );
@@ -541,12 +631,6 @@ mobf_trader.show_trader_formspec = function( self, player, menu_path, fields )
 	end
 
 	
-	-- only the owner can add offers
-	if( (self.trader_owner and self.trader_owner == pname ) and self.trader_typ=='individual') then
-		formspec = formspec..'button[9,'..(1.5+m_up)..';1,0.5;'..npc_id..'_add;Add]'; 
-	end
-
-
 	-- show the goods the trader has to offer
 	for i,v in ipairs( trader_goods ) do
 
@@ -567,6 +651,10 @@ mobf_trader.show_trader_formspec = function( self, player, menu_path, fields )
 
 		local trade_details = trader_goods[ choice1 ];
 
+		-- when offering 6 diffrent methods of payment, we can't display 4 items per payment - there's simply not enough space
+		if( offer_packages and #trade_details > 4 ) then
+			offer_packages = false;
+		end
 
 		if( #menu_path >= 2 ) then
 
@@ -583,6 +671,7 @@ mobf_trader.show_trader_formspec = function( self, player, menu_path, fields )
 			else
 				formspec = formspec..
 					'label[0.3,'..(4.0+p_up)..';Get]'..
+					'box[0.25,'..(3.8+p_up)..';1.75,1.10;#00AA00]'..
 
 					mobf_trader.show_trader_formspec_item_list(
 						0.5, 4.0+p_up-0.6, trade_details[1], menu_path[2], npc_id, 1.0, 1.0, 1 );
@@ -600,10 +689,14 @@ mobf_trader.show_trader_formspec = function( self, player, menu_path, fields )
 			local or_or_for = 'for';
 			for i,v in ipairs( trade_details ) do
 	
+				local boxcolor = '#0000CC';
 				-- the first entry is the good that is offered; all subsequent ones are prices
 				if( i > 1 ) then
 					if( i > 2 ) then
 						or_or_for = 'or';
+					end
+					if( i%2==1 ) then
+						boxcolor = '#AAAAAA';
 					end
 					if( offer_packages ) then 
 						formspec = formspec..
@@ -613,12 +706,13 @@ mobf_trader.show_trader_formspec = function( self, player, menu_path, fields )
 
 							mobf_trader.show_trader_formspec_item_list(
 								((i-1)*2.40), 4.0+p_up-0.6, trade_details[i], i, npc_id, 1.0, 1.0, 1 )..
-								'box['..(-0.15+((i-1)*2.40))..','..(4.0+p_up-0.70)..';2.1,2.4;#0000CC]';
+								'box['..(-0.15+((i-1)*2.40))..','..(4.0+p_up-0.70)..';2.1,2.4;'..boxcolor..']';
 					else
 						formspec = formspec..
 							'label['..((i)*1.2-0.3)..','..(4.0+p_up)..';'..or_or_for..']'..
+							'box['..((i*1.2)-0.34)..','..(3.8+p_up)..';1.15,1.10;'..boxcolor..']'..
 							mobf_trader.show_trader_formspec_item_list(
-								((i)*1.2-0.5), 4.0+p_up-0.6, trade_details[i], i, npc_id, 1.0, 1.0, 1 );
+								((i*1.2)-0.5), 4.0+p_up-0.6, trade_details[i], i, npc_id, 1.0, 1.0, 1 );
 					end
 				end
 			end
