@@ -28,8 +28,6 @@ Features:
 
 -- TODO: accept group:bla for prices as well? could be very practical!
 -- TODO: save trader data to a file
-
--- TODO: what about used items? (i.e. almost broken picks...) and other items with individual data
 mobf_trader = {}
 
 mobf_trader.npc_trader_data = {}
@@ -264,7 +262,229 @@ end
 
 
 
+--------------------------------------------------
+-- Store new trade offer or change existing one
+--------------------------------------------------
+-- changes trader_goods if the add or edit succeeded
+-- changes menu_path so that the newly added/edited offer is displayed
+-- sends a chat message to the player in case of success and returns ''; else returns error message
+mobf_trader.store_trade_offer_changes = function( self, pname,  menu_path, fields, trader_goods )
 
+	local offer = {};
+	local i = 1;
+	local j = 1;
+
+	-- t1 has to be filled in - it has to contain the stack the player wants to offer
+	if(   (not( fields[ 't1' ] ) or fields[ 't1'] == '' )
+	  and (not( fields[ 't2' ] ) or fields[ 't2'] == '' )
+	  and (not( fields[ 't3' ] ) or fields[ 't3'] == '' )
+	  and (not( fields[ 't4' ] ) or fields[ 't4'] == '' )) then
+		return 'Error: What do you want to offer? Please enter something after \'Sell:\'!';
+	end
+
+	for i=1,mobf_trader.MAX_ALTERNATE_PAYMENTS do
+		local offer_one_side = {};
+		for j=1,4 do
+			local text = fields[ 't'..tostring(((i-1)*4)+j) ];
+			if( text and text ~= '' ) then
+				local help = text:split( ' ' );
+				-- if no amount is given, assume 1
+				if( #help < 2 ) then
+					help[2] = 1;
+				end
+				-- the amount of items can only be positive
+				help[2] = tonumber( help[2] );
+				if( not( help[2] ) or help[2]<1 ) then
+					return 'Error: Negative amounts are not supported: \''..( text )..'\'.';
+				end
+				-- money and money2 are acceptable as well
+				if( not( minetest.registered_items[ help[1] ] ) and help[1]~='mobf_trader:money' and help[1]~='mobf_trader:money2') then
+					return 'Error: \''..tostring( help[1] )..'\' is not a valid item. Please check your spelling.';
+				end
+				table.insert( offer_one_side, text );
+			end
+		end
+		-- use a string to store
+		if( #offer_one_side==1) then
+			table.insert( offer, offer_one_side[1] );
+		-- use a table to store (necessary when up to four items are bundled)
+		elseif( #offer_one_side>1) then
+			table.insert( offer, offer_one_side );
+		end
+	end
+	if( #offer < 2 ) then
+		return 'Please provide at least one form of payment.';
+	end
+	if( #trader_goods >= mobf_trader.MAX_OFFERS and (menu_path[2]=='storenew' or menu_path[2]=='storenewm')) then
+		return 'Sorry. Each trader can only make up to '..tostring( mobf_trader.MAX_OFFERS )..' diffrent offers.';
+	end
+
+
+	if( not(trader_goods )) then
+		trader_goods = {};
+	end
+	if( menu_path[2]=='storenew' or menu_path[2]=='storenewm') then
+		-- TODO: check if a similar offer exists already
+		table.insert( trader_goods, offer ); 
+		-- inform the trader about his new offer
+		self.trader_goods = trader_goods;
+			
+		-- display the newly stored offer
+		minetest.chat_send_player( pname, 'Your new offer has been added.');
+
+		-- make sure the new offer is selected and displayed when this function here continues
+		menu_path[2] = #trader_goods;
+		return '';
+
+	elseif( menu_path[2]=='storechange') then
+		local edit_nr = tonumber( menu_path[3] );
+		-- store the modified offer
+		if( edit_nr and edit_nr > 0 and edit_nr <= #trader_goods ) then
+			trader_goods[ edit_nr ] = offer;
+			self.trader_goods       = trader_goods;
+			minetest.chat_send_player( pname, 'The offer has been changed.');
+		end
+		-- display the modified offer
+		menu_path[2] = edit_nr;
+		menu_path[3] = nil;
+		return '';
+	end
+	return 'Error: Unknown command.';
+end
+
+
+-------------------------------------------------------------------------------
+-- show a formspec that allows to add a new trade offer or edit an existing one
+-------------------------------------------------------------------------------
+mobf_trader.show_trader_formspec_edit = function( self, player,  menu_path, fields, trader_goods, formspec, npc_id, pname )
+
+
+	local player_inv = player:get_inventory();
+	local edit_nr    = 0;
+
+	if(     menu_path[2]=='add') then
+		formspec = formspec..
+			'button[0.5,6.3;2,0.5;'..npc_id..'_storenew;Store]'..
+			'button[3.0,6.3;2,0.5;'..npc_id..'_main;Abort]'..
+			'label[3.0,-0.2;Add a new simple trade offer]'..
+			'textarea[1.0,0.5;9,1.5;info;;'..( minetest.formspec_escape( 
+				'Plese enter what you want to trade in exchange for what.\n'..
+				'The items in the top row of your inventory serve as sample entries to the fields here.\n'..
+				'Please edit the input fields to suit your needs or abort and re-arrange your inventory so\n'..
+				'that what you want to offer is leftmost, while trade goods you ask for extend to the right.'))..']';
+	elseif( menu_path[2]=='addm' ) then
+		formspec = formspec..
+			'button[0.5,6.3;2,0.5;'..npc_id..'_storenewm;Store]'..
+			'button[3.0,6.3;2,0.5;'..npc_id..'_main;Abort]'..
+			'label[3.0,-0.2;Add a new complex trade offer]'..
+			'textarea[1.0,0.5;9,1.5;info;;'..( minetest.formspec_escape( 
+				'Plese enter which item(s) you want to trade in exchange for which item(s).\n'..
+				'The items in the colored columns of your inventory serve as sample entries to the fields here.\n'..
+				'Please edit the input fields to suit your needs or abort and re-arrange your inventory.\n'..
+				'The green, blue and gray fields form bundles of up to four items.'))..']';
+	elseif( menu_path[2]=='edit' ) then
+		formspec = formspec..
+			'button_exit[0.5,6.3;2,0.5;'..npc_id..'_storechange_'..menu_path[3]..';Store]'..
+			'button_exit[3.0,6.3;2,0.5;'..npc_id..'_main;Abort]'..
+			'label[3.0,-0.2;Edit trade offer]'..
+			'textarea[1.0,1.5;9,0.5;info;;'..minetest.formspec_escape( 
+				'Plese edit this trade offer according to your needs.')..']';
+		edit_nr = tonumber( menu_path[3] );
+		if( not( edit_nr ) or edit_nr < 1 or edit_nr>#trader_goods ) then
+			edit_nr = 0;
+		end
+	end
+
+	local texts = {};
+	-- add a complex trade with multiple (up to four) items for each side? or is a 1:1 trade sufficient?
+	local extended = false;
+	if( menu_path[2]=='addm' ) then
+		extended = true;
+	end
+	for i=1,mobf_trader.MAX_ALTERNATE_PAYMENTS do
+		for j=1,4 do
+			local text  = '';
+
+			-- edit input from previous attempt
+			if( fields and fields[ 't'..tostring(((i-1)*4)+j) ] ) then
+				text = fields[ 't'..tostring(((i-1)*4)+j) ];
+			-- edit an existing offer
+			elseif( edit_nr and edit_nr > 0 and edit_nr <= #trader_goods ) then
+				if( type( trader_goods[ edit_nr ][i] )=='table' ) then
+					text = ( trader_goods[ edit_nr ][i][j] or '');
+					extended = true;
+				elseif( j==1 ) then
+					text = ( trader_goods[ edit_nr ][i]    or '');
+				else
+					text = '';
+				end
+			-- take what's in the player's inventory as a base
+			else
+				local stack = player_inv:get_stack( 'main', ((j-1)*8)+i );
+
+				if( not( stack:is_empty() )) then
+					text = stack:get_name()..' '..stack:get_count();
+				else
+					text = '';
+				end
+			end
+			table.insert( texts, text );
+		end
+	end
+
+	for i=1,mobf_trader.MAX_ALTERNATE_PAYMENTS do
+		local o     = 0;
+		local ltext = 'or';
+		local boxcolor = '#0000CC';
+		-- the 'Sell' is not as far to the right as the rest
+		if(     i==1 ) then
+			o     = -1;
+			ltext = 'Sell';
+			boxcolor = '#00AA00';
+		elseif( i==2 ) then
+			ltext = 'for';
+		elseif( i>1 and (i%2==1)) then
+			boxcolor = '#AAAAAA';
+		end
+		if( extended ) then -- distinguish between simple (one item offered, 1 wanted) and complex (up to 4 offered; up to 4 wanted) trades
+			if( i<5 ) then
+			    formspec = formspec..
+				'label['..(1.0+o)..','..( 1.0+(i*1.1))..';'..ltext..']'..
+				'box['..(  0.8+o)..','..( 0.86+(i*1.1))..';9.1,1.04;'..boxcolor..']'..
+				'field['..(2.1+o)..','..( 1.0+(i*1.1))..';3.9,1.0;t'..tostring((i*4)-3)..';;'..
+					minetest.formspec_escape( texts[ (i*4)-3] )..']'..
+				'field['..(2.1+o)..','..( 1.5+(i*1.1))..';3.9,1.0;t'..tostring((i*4)-2)..';;'..
+					minetest.formspec_escape( texts[ (i*4)-2] )..']'..
+				'field['..(6.2+o)..','..( 1.0+(i*1.1))..';3.9,1.0;t'..tostring((i*4)-1)..';;'..
+					minetest.formspec_escape( texts[ (i*4)-1] )..']'..
+				'field['..(6.2+o)..','..( 1.5+(i*1.1))..';3.9,1.0;t'..tostring((i*4)  )..';;'..
+					minetest.formspec_escape( texts[ (i*4)  ] )..']'..
+				'label['..(5.5+o)..','..( 1.0+(i*1.1))..';and]';
+			end
+		else
+			-- the colors are a bit darker when offering a simple trade
+			if( boxcolor=='#AAAAAA' ) then
+				boxcolor = '#777777';
+			elseif( boxcolor=='#0000CC' ) then
+				boxcolor = '#000077';
+			end
+			formspec = formspec..
+				'label['..(2.0+o)..','..( 2.5+(i*0.5))..';'..ltext..']'..
+				'box['..(  1.8+o)..','..( 2.55+(i*0.5))..';8.1,0.51;'..boxcolor..']'..
+				'field['..(3.1+o)..','..( 2.7+(i*0.5))..';7,1.0;t'..tostring((i*4)-3)..';;'..
+					minetest.formspec_escape( texts[ (i*4)-3 ] )..']';
+		end
+	end
+	minetest.show_formspec( pname, "mobf_trader:trader", formspec );
+end
+
+
+
+-------------------------------------------------------------------------------
+-- main formspec of the trader
+-------------------------------------------------------------------------------
+-- the trader entity turns towards the player
+-- usually shows the goods the trader has to offer plus trade details once an offer has been selected
 mobf_trader.show_trader_formspec = function( self, player, menu_path, fields )
 
 	if( not( self ) or not( player )) then
@@ -356,95 +576,24 @@ mobf_trader.show_trader_formspec = function( self, player, menu_path, fields )
 
 
 	-- the player wants to store a new trade offer or change an existing one
-	if( menu_path and #menu_path > 1 and (menu_path[2]=='storenew' or menu_path[2]=='storechange')) then
+	if( menu_path and #menu_path > 1 and (menu_path[2]=='storenew' or menu_path[2]=='storenewm' or menu_path[2]=='storechange')) then
 
-		local error_msg = '';
-		local offer     = {};
-		-- t1 has to be filled in - it has to contain the stack the player wants to offer
-		if( not( fields[ 't1' ] ) or fields[ 't1'] == '' ) then
-			error_msg = 'Error: What do you want to offer? Please enter something after \'Sell:\'!';
-		end
-		for i=1,mobf_trader.MAX_ALTERNATE_PAYMENTS do
-			local offer_one_side = {};
-			for j=1,4 do
-				local text = fields[ 't'..tostring(((i-1)*4)+j) ];
-				if( text and text ~= '' ) then
-					local help = text:split( ' ' );
-					-- if no amount is given, assume 1
-					if( #help < 2 ) then
-						help[2] = 1;
-					end
-					-- the amount of items can only be positive
-					help[2] = tonumber( help[2] );
-					if( not( help[2] ) or help[2]<1 ) then
-						error_msg = 'Error: Negative amounts are not supported: \''..( text )..'\'.';
-					end
-					-- money and money2 are acceptable as well
-					if( not( minetest.registered_items[ help[1] ] ) and help[1]~='mobf_trader:money' and help[1]~='mobf_trader:money2') then
-						error_msg = 'Error: \''..tostring( help[1] )..'\' is not a valid item. Please check your spelling.';
-					end
-					if( error_msg == '' ) then
-						table.insert( offer_one_side, text );
-					end
-				end
-			end
-			-- use a string to store
-			if(     error_msg == '' and #offer_one_side==1) then
-				table.insert( offer, offer_one_side[1] );
-			-- use a table to store
-			elseif( error_msg == '' and #offer_one_side>1) then
-				table.insert( offer, offer_one_side );
-			end
-		end
-		if( #offer < 2 ) then
-			error_msg = 'Please provide at least one form of payment.';
-		end
-		if( #trader_goods >= mobf_trader.MAX_OFFERS and menu_path[2]=='storenew') then
-			error_msg = 'Sorry. Each trader can only make up to '..tostring( mobf_trader.MAX_OFFERS )..' diffrent offers.';
-		end
-
-
-		if(     error_msg == '' and menu_path[2]=='storenew') then
-			if( not(trader_goods )) then
-				trader_goods = {};
-			end
-			-- TODO: check if a similar offer exists already
-			table.insert( trader_goods, offer ); 
-			-- inform the trader about his new offer
-			self.trader_goods = trader_goods;
-			
-			-- display the newly stored offer
-			minetest.chat_send_player( pname, 'Your new offer has been added.');
-
-			-- make sure the new offer is selected and displayed when this function here continues
-			menu_path[2] = #trader_goods;
-
-		elseif( error_msg == '' and menu_path[2]=='storechange') then
-			if( not(trader_goods )) then
-				trader_goods = {};
-			end
-			local edit_nr = tonumber( menu_path[3] );
-			-- store the modified offer
-			if( edit_nr and edit_nr > 0 and edit_nr <= #trader_goods ) then
-				trader_goods[ edit_nr ] = offer;
-				self.trader_goods       = trader_goods;
-				minetest.chat_send_player( pname, 'The offer has been changed.');
-			end
-			-- display the modified offer
-			menu_path[2] = edit_nr;
-			menu_path[3] = nil;
+		local error_msg = mobf_trader.store_trade_offer_changes( self, pname,  menu_path, fields, trader_goods );
 
 		-- in case of error: display the input again so that the player can edit it
-		elseif( menu_path[2]=='storenew' ) then
-			menu_path[2] = 'add';
+		if( error_msg ~= '' ) then
+			if(     menu_path[2]=='storenewm') then 
+				menu_path[2] = 'addm';
+			elseif( menu_path[2]=='storenew' ) then
+				menu_path[2] = 'add';
+			elseif( menu_path[2]=='storechange' ) then
+				menu_path[2] = 'edit';
+			end
+			-- show the error
 			formspec = formspec..
-				'textarea[1.0,0.5;9,1.5;info;;'..minetest.formspec_escape( error_msg  )..']';
-					
-		-- changing an existing offer failed; offer to edit it
-		elseif( menu_path[2]=='storechange' ) then
-			menu_path[2] = 'edit';
-			formspec = formspec..
-				'textarea[1.0,0.5;9,1.5;info;;'..minetest.formspec_escape( error_msg  )..']';
+				'textarea[1.0,1.6;9,0.5;info;;'..minetest.formspec_escape( error_msg  )..']';
+			-- send the player a chat message as well
+			minetest.chat_send_player( pname, error_msg );
 		end
 	end
 
@@ -452,122 +601,11 @@ mobf_trader.show_trader_formspec = function( self, player, menu_path, fields )
 	-- add a new trade offer for the individual trader
 	if( menu_path and #menu_path > 1 and (menu_path[2]=='add' or menu_path[2]=='edit' or menu_path[2]=='addm')) then
 
-		local player_inv = player:get_inventory();
-		local edit_nr    = 0;
-
-		if(     menu_path[2]=='add' or menu_path[2]=='addm') then
-			formspec = formspec..
-				'button[0.5,6.3;2,0.5;'..npc_id..'_storenew;Store]'..
-				'button[3.0,6.3;2,0.5;'..npc_id..'_main;Abort]'..
-				'label[3.0,-0.2;Add a new trade offer]'..
-				'textarea[1.0,0.5;9,1.5;info;;'..( minetest.formspec_escape( 
-					'Plese enter what you want to trade in exchange for what.\n'..
-					'The items in the top row of your inventory serve as sample entries to the fields here.\n'..
-					'Please edit the input fields to suit your needs or abort and re-arrange your inventory so\n'..
-					'that what you want to offer is leftmost, while trade goods you ask for extend to the right.'))..']';
-		elseif( menu_path[2]=='edit' ) then
-			formspec = formspec..
-				'button_exit[0.5,6.3;2,0.5;'..npc_id..'_storechange_'..menu_path[3]..';Store]'..
-				'button_exit[3.0,6.3;2,0.5;'..npc_id..'_main;Abort]'..
-				'label[3.0,-0.2;Edit trade offer]'..
-				'textarea[1.0,1.5;9,0.5;info;;'..minetest.formspec_escape( 
-					'Plese edit this trade offer according to your needs.')..']';
-			edit_nr = tonumber( menu_path[3] );
-			if( not( edit_nr ) or edit_nr < 1 or edit_nr>#trader_goods ) then
-				edit_nr = 0;
-			end
-		end
-
-		local texts = {};
-		local extended = false;
-		if( menu_path[2]=='addm' ) then
-			extended = true;
-		end
-		for i=1,mobf_trader.MAX_ALTERNATE_PAYMENTS do
-			for j=1,4 do
-				local text  = '';
-
-				-- edit input from previous attempt
-				if( fields and fields[ 't'..tostring((i-1)+j) ] ) then
-					text = fields[ 't'..tostring((i-1)+j) ];
-				-- edit an existing offer
-				elseif( edit_nr and edit_nr > 0 and edit_nr <= #trader_goods ) then
-					if( type( trader_goods[ edit_nr ][i] )=='table' ) then
-						text = ( trader_goods[ edit_nr ][i][j] or '');
-						extended = true;
-					elseif( j==1 ) then
-						text = ( trader_goods[ edit_nr ][i]    or '');
-					else
-						text = '';
-					end
-				-- take what's in the player's inventory as a base
-				else
-					local stack = player_inv:get_stack( 'main', ((j-1)*8)+i );
-
-					if( not( stack:is_empty() )) then
-						text = stack:get_name()..' '..stack:get_count();
-					else
-						text = '';
-					end
-				end
-				table.insert( texts, text );
-			end
-		end
-
-		for i=1,mobf_trader.MAX_ALTERNATE_PAYMENTS do
-			local o     = 0;
-			local ltext = 'or';
-			local boxcolor = '#0000CC';
-			-- the 'Sell' is not as far to the right as the rest
-			if(     i==1 ) then
-				o     = -1;
-				ltext = 'Sell';
-				boxcolor = '#00AA00';
-			elseif( i==2 ) then
-				ltext = 'for';
-			elseif( i>1 and (i%2==1)) then
-				boxcolor = '#AAAAAA';
-			end
-			if( extended ) then -- distinguish between simple (one item offered, 1 wanted) and complex (up to 4 offered; up to 4 wanted) trades
-				if( i<5 ) then
-				    formspec = formspec..
-					'label['..(1.0+o)..','..( 1.0+(i*1.1))..';'..ltext..']'..
-					'box['..(  0.8+o)..','..( 0.86+(i*1.1))..';9.1,1.04;'..boxcolor..']'..
-					'field['..(2.1+o)..','..( 1.0+(i*1.1))..';3.9,1.0;t'..tostring((i*4)-3)..';;'..
-						minetest.formspec_escape( texts[ (i*4)-3] )..']'..
-					'field['..(2.1+o)..','..( 1.5+(i*1.1))..';3.9,1.0;t'..tostring((i*4)-2)..';;'..
-						minetest.formspec_escape( texts[ (i*4)-2] )..']'..
-					'field['..(6.2+o)..','..( 1.0+(i*1.1))..';3.9,1.0;t'..tostring((i*4)-1)..';;'..
-						minetest.formspec_escape( texts[ (i*4)-1] )..']'..
-					'field['..(6.2+o)..','..( 1.5+(i*1.1))..';3.9,1.0;t'..tostring((i*4)  )..';;'..
-						minetest.formspec_escape( texts[ (i*4)  ] )..']'..
-					'label['..(5.5+o)..','..( 1.0+(i*1.1))..';and]';
-				end
-			else
-				-- the colors are a bit darker when offering a simple trade
-				if( boxcolor=='#AAAAAA' ) then
-					boxcolor = '#777777';
-				elseif( boxcolor=='#0000CC' ) then
-					boxcolor = '#000077';
-				end
-				formspec = formspec..
-					'label['..(2.0+o)..','..( 2.5+(i*0.5))..';'..ltext..']'..
-					'box['..(  1.8+o)..','..( 2.55+(i*0.5))..';8.1,0.51;'..boxcolor..']'..
-					'field['..(3.1+o)..','..( 2.7+(i*0.5))..';7,1.0;t'..tostring((i*4)-3)..';;'..
-						minetest.formspec_escape( texts[ (i*4)-3 ] )..']';
-			end
-		end
-				
-		minetest.show_formspec( pname, "mobf_trader:trader", formspec );
+		mobf_trader.show_trader_formspec_edit( self, player,  menu_path, fields, trader_goods, formspec, npc_id, pname );
+		-- the function above already displayed a formspec; nothing more to do here
 		return;
 	end
 
-
-
-	if( menu_path and #menu_path > 0 ) then
-		formspec = formspec..
-			 'button[4.5,6.3;2,0.5;'..menu_path[1]..';Show goods]';
-	end
 
 
 	-- it is possible to display up to 4 items which may together form one offer; this needs a diffrent sort of visualization
@@ -610,9 +648,17 @@ mobf_trader.show_trader_formspec = function( self, player, menu_path, fields )
 
 	local greeting3 = '';
 	if( self.trader_owner and self.trader_owner ~= '' ) then
-		greeting3 = tostring( self.trader_owner )..' is my employer.';
+		if( self.trader_owner == pname ) then
+			greeting3 = 'You are my employer.';
+		else
+			greeting3 = tostring( self.trader_owner )..' is my employer.';
+		end
 	else
 		greeting3 = 'I work for myshelf.';
+	end
+
+	if( menu_path and menu_path[1] ) then
+	      formspec = formspec..'button[4.5,6.3;2,0.5;'..menu_path[1]..';Show goods]';
 	end
 
 	formspec = formspec..'label[0.5,'..(0.5+m_up)..';'..minetest.formspec_escape( greeting1 )..']'..
@@ -627,7 +673,7 @@ mobf_trader.show_trader_formspec = function( self, player, menu_path, fields )
 	if( (self.trader_owner and self.trader_owner == pname)
 	  or minetest.check_player_privs( pname, {trader_take=true})) then
 
-		formspec = formspec..'button[9,0.5;1,0.5;'..npc_id..'_take;Take]';
+		formspec = formspec..'button_exit[9,0.5;1,0.5;'..npc_id..'_take;Take]';
 	end
 
 	
@@ -725,6 +771,7 @@ mobf_trader.show_trader_formspec = function( self, player, menu_path, fields )
 			if( res.msg ) then
 				formspec = formspec..
 					'textarea[1.0,5.1;8,1.0;info;;'..( minetest.formspec_escape( res.msg ))..']';
+				minetest.chat_send_player( pname, res.msg );
 			end
 			if( res.success ) then
 				formspec = formspec..
@@ -752,11 +799,61 @@ end
 
 
 
--- checks if the deptor can pay the price to the receiver (and if the receiver can take it)
--- if the other side is an admin shop/trader with unlimited supply:
+-----------------------------------------------------------------------------------------------------
+-- checks if the deptor can pay the price to the receiver (and if the receiver has enough free space)
+-----------------------------------------------------------------------------------------------------
+-- If the other side is an admin shop/trader with unlimited supply:
 --          receiver_name has to be nil or '' and  receiver_inv has to be empty for unlmiited trade
+-- The function uses recursion in case of table value for price_stack_str and calls itshelf for each price part.
 mobf_trader.can_trade = function( price_stack_str, debtor_name, debtor_inv, receiver_name, receiver_inv, player_is_debtor )
 
+	-- we've got multiple items to care for
+	if( type( price_stack_str )=='table' ) then
+		
+		-- sum up requests like 2x99 of one type or multiple requests for money
+		local items = {};
+		local anz_diffrent_items = 0;
+		for _,v in ipairs( price_stack_str ) do
+			local price_stack = ItemStack( v );
+			-- get information about the price
+			local price_stack_name  = price_stack:get_name();
+			local price_stack_count = price_stack:get_count();
+			if( not( items[ price_stack_name ])) then
+				items[ price_stack_name ] = price_stack_count;
+				-- lua can't count....
+				anz_diffrent_items = anz_diffrent_items + 1;
+			else
+				items[ price_stack_name ] = items[ price_stack_name ] + price_stack_count;
+			end
+		end
+		-- check for each part if it can be paid
+		local price_desc   = '';
+		local price_stacks = {};
+		local price_types  = {};
+		for k,v in pairs( items ) do
+			-- recursively check if payment is possible
+			local res = mobf_trader.can_trade( k..' '..tostring( v ), debtor_name, debtor_inv, receiver_name, receiver_inv, player_is_debtor );
+			-- if a part cannot be paid, the whole trade cannot be made
+			if( res.error_msg ) then
+				return res;
+			end
+			-- store the information about this part of the payment
+			table.insert( price_stacks, res.price_stacks[1]);
+			table.insert( price_types,  res.price_types[1] );
+			-- description of first item 
+			if(     price_desc == '' ) then
+				price_desc = res.price_desc;
+			-- cheat: this isthe last price description
+			elseif( #price_stacks == anz_diffrent_items ) then
+				price_desc = price_desc..' and '..res.price_desc;
+			else
+				price_desc = price_desc..', '..res.price_desc;
+			end
+		end
+		-- if all parts can be paid, the whole payment will be possible
+		return { error_msg = nil, price_desc = price_desc, price_stacks = price_stacks, price_types = price_types };
+	end
+	
 	price_stack = ItemStack( price_stack_str );
 	-- get information about the price
 	local price_desc        = '';
@@ -834,7 +931,7 @@ mobf_trader.can_trade = function( price_stack_str, debtor_name, debtor_inv, rece
 
 
 	if( error_msg == '' ) then
-		return { error_msg = nil, price_desc = price_desc, price_stack = price_stack, price_type = price_type };
+		return { error_msg = nil, price_desc = price_desc, price_stacks = {price_stack}, price_types = {price_type} };
 	end
 
 	-- create extensive error messages, depending on who does lack what in order to finish the trade
@@ -877,14 +974,75 @@ mobf_trader.can_trade = function( price_stack_str, debtor_name, debtor_inv, rece
 
 
 	-- price_desc is important for printing out the price to the player
-	return { error_msg = error_msg, price_desc = price_desc, price_stack = price_stack, price_type = price_type };
+	return { error_msg = error_msg, price_desc = price_desc, price_stacks = {price_stack}, price_types = {price_type} };
 end
 
 
 
+-----------------------------------------------------------------------------------------------------
+-- moves stack from source_inv to target_inv;
+--     if either does not exist, the stack is removed (i.e. with traders that are not of type individual)
+-----------------------------------------------------------------------------------------------------
+mobf_trader.move_trade_goods = function( source_inv, target_inv, stack )
 
+	local stacks_removed = {};
+
+	-- in case of non-individual traders selling something, there might be no source inv
+	if( source_inv ) then
+		local anz = stack:get_count();
+		-- large stacks may have to be split up
+		while( anz > 0 ) do
+			-- do not create stacks which are larger than get_stack_max
+			if( stack:get_stack_max() < anz) then
+				stack:set_count( stack:get_stack_max() );
+			end
+			local removed = source_inv:remove_item( "main", stack );
+			if( not(removed) or removed:get_count() < 1 ) then
+-- TODO: what to do with the partly removed items?
+				return false;
+			end
+			anz = anz - removed:get_count();
+			stack:set_count( anz );
+			table.insert( stacks_removed, removed );
+		end
+	else
+		stacks_removed = { stack };
+	end
+
+	-- non-individual traders do not store what they receive; they have no target inv
+	if( not( target_inv )) then
+		return true;
+	end
+
+	for i,v in pairs( stacks_removed ) do
+		-- the stack may be larger than max stack size and thus require more than one add_item-call
+		local remaining_stack = v;	
+		while( not( remaining_stack:is_empty() )) do
+
+			-- add as many as possible in one go
+			leftover = target_inv:add_item( 'main', remaining_stack );
+
+			-- in case nothing was added to target_inv: an error occoured (i.e. target_inv full)
+			if( not( leftover:is_empty())
+			    and (leftover:get_count() >= remaining_stack():get_count())) then
+			-- TODO: do something more here?
+minetest.chat_send_player('singleplayer','ERROR: FAILED TO ADD '..tostring( leftover:get_name()..' '..leftover:get_count()));
+				return false;
+			end
+			remaining_stack = leftover;
+		end
+	end
+	-- everything has been moved
+	return true;
+end
+
+
+-----------------------------------------------------------------------------------------------------
 -- check if payment and trade are possible; do the actual trade
+-----------------------------------------------------------------------------------------------------
 -- self ought to contain: trader_id, trader_typ, trader_owner, trader_home_pos, trader_sold (optional - for statistics)
+-- traders of the type 'individual' who do have owners will search their environment for chests owned by their owner;
+--      said chests contain the stock of the trader
 mobf_trader.do_trade = function( self, player, menu_path, trade_details )
 
 	if( not( self ) or not( player ) or not( menu_path ) or #menu_path < 3) then
@@ -905,20 +1063,25 @@ mobf_trader.do_trade = function( self, player, menu_path, trade_details )
 	-- traders who do have an owner need to have an inventory somewhere
 	if( self.trader_owner and self.trader_owner ~= '' and self.trader_typ=='individual') then
 
-		if( not( self.trader_home_pos ) ) then
-			self.trader_home_pos = {x=0,y=0,z=0};
+		local RANGE = mobf_trader.LOCKED_CHEST_SEARCH_RANGE;
+		local tpos = self.object:getpos(); -- current position of the trader
+		-- search for locked chest from default, locks mod and technic mod chests
+		-- ignore technic mithril chests as those are not locked
+		local chest_list = minetest.find_nodes_in_area(
+			{ x=(tpos.x-RANGE), y=(tpos.y-RANGE), z=(tpos.z-RANGE )},
+			{ x=(tpos.x+RANGE), y=(tpos.y+RANGE), z=(tpos.z+RANGE )},
+			{'default:chest_locked',        'locks:shared_locked_chest', 
+			 'technic:iron_locked_chest',   'technic:copper_locked_chest',
+			 'technic:silver_locked_chest', 'technic:gold_locked_chest'});
+		trader_inv = nil;
+		for _, p in ipairs( chest_list ) do
+			meta = minetest.get_meta( p );
+			if( not( trader_inv) and meta and meta:get_string('owner') and meta:get_string('owner')==self.trader_owner ) then
+				trader_inv = meta:get_inventory();
+			end
 		end
 
-		local node = minetest.get_node( self.trader_home_pos );
-		local meta = minetest.get_meta( self.trader_home_pos );
-
-		-- the object at trader_home_pos has to be owned by the trader owner (hopefully it's a chest!
-		if( node and meta and meta:get_string('owner') and meta:get_string('owner')==self.trader_owner ) then
-	
-			trader_inv = meta:get_inventory();
-		end
-
-		if( not( trader_inv ) or trader_inv:is_empty()) then
+		if( not( trader_inv )) then
 			return {msg='Sorry. I was unable to find my storage chest. Please contact my owner!', success=false};
 		end
 	end
@@ -939,42 +1102,41 @@ mobf_trader.do_trade = function( self, player, menu_path, trade_details )
 	-- both sides are able to give what they agreed on - the trade may progress;
 	-- traders that use money/money2 need to have an owner for their account
 
-	-- the player pays first
-	if(     player_can_trade.price_type == 'money' ) then
-		local amount = player_can_trade.price_stack:get_count();
-		money.set_money( self.trader_owner, get_money( self.trader_owner ) + amount );
-		money.set_money( pname,             get_money( pname )             - amount );
-				
-	elseif( player_can_trade.price_type == 'money2' ) then
-		local res = money.transfer( pname, self.trader_owner, player_can_trade.price_stack:get_count() );
-		if( res ) then
-			return {msg='Internal error: Payment failed: '..tostring( res )..'.', success=false};
-		end
-
-	elseif( player_can_trade.price_type == 'direct' ) then
-		player_inv:remove_item(     "main", trade_details[ choice2 ] );
-		if( trader_inv ) then
-			trader_inv:add_item("main", trade_details[ choice2 ] );
+	-- each trade may require the exchange of multiple items
+	for i,v in pairs( player_can_trade.price_types ) do
+		-- the player pays first
+		if(     player_can_trade.price_types[i] == 'money' ) then
+			local amount = player_can_trade.price_stacks[i]:get_count();
+			money.set_money( self.trader_owner, get_money( self.trader_owner ) + amount );
+			money.set_money( pname,             get_money( pname )             - amount );
+					
+		elseif( player_can_trade.price_types[i] == 'money2' ) then
+			local res = money.transfer( pname, self.trader_owner, player_can_trade.price_stacks[i]:get_count() );
+			if( res ) then
+				return {msg='Internal error: Payment failed: '..tostring( res )..'.', success=false};
+			end
+	
+		elseif( player_can_trade.price_types[i] == 'direct' ) then
+			local res = mobf_trader.move_trade_goods( player_inv, trader_inv, player_can_trade.price_stacks[i] );
 		end
 	end
 
 
-	-- the trader replies
-	if(     trader_can_trade.price_type == 'money' ) then
-		local amount = trader_can_trade.price_stack:get_count();
-		money.set_money( pname,             get_money( pname )             + amount );
-		money.set_money( self.trader_owner, get_money( self.trader_owner ) - amount );
-				
-	elseif( trader_can_trade.price_type == 'money2' ) then
-		local res = money.transfer( self.trader_owner, pname, trader_can_trade.price_stack:get_count() );
-		if( not( res )) then
-			return {msg='Internal error: Payment failed.', success=false};
-		end
-
-	elseif( trader_can_trade.price_type == 'direct' ) then
-		player_inv:add_item(           "main", trade_details[ 1 ] );
-		if( trader_inv ) then
-			trader_inv:remove_item("main", trade_details[ 1 ] );
+	for i,v in pairs( trader_can_trade.price_types ) do
+		-- the trader replies
+		if(     trader_can_trade.price_types[i] == 'money' ) then
+			local amount = trader_can_trade.price_stacks[i]:get_count();
+			money.set_money( pname,             get_money( pname )             + amount );
+			money.set_money( self.trader_owner, get_money( self.trader_owner ) - amount );
+					
+		elseif( trader_can_trade.price_types[i] == 'money2' ) then
+			local res = money.transfer( self.trader_owner, pname, trader_can_trade.price_stacks[i]:get_count() );
+			if( not( res )) then
+				return {msg='Internal error: Payment failed.', success=false};
+			end
+	
+		elseif( trader_can_trade.price_types[i] == 'direct' ) then
+			local res = mobf_trader.move_trade_goods( trader_inv, player_inv, trader_can_trade.price_stacks[i] );
 		end
 	end
 
@@ -991,8 +1153,8 @@ mobf_trader.do_trade = function( self, player, menu_path, trade_details )
 
 	-- log the action
 	mobf_trader.log( player:get_player_name()..
-		' gets '..tostring( trade_details[ 1 ])..
-		' for ' ..tostring( trade_details[ choice2 ])..
+		' gets '..minetest.serialize( trade_details[ 1 ])..
+		' for ' ..minetest.serialize( trade_details[ choice2 ])..
 		' from '..tostring( self.trader_id )..
 		' (owned by '..tostring( self.trader_owner )..')');
 
@@ -1004,7 +1166,9 @@ end
 
 
 
+-----------------------------------------------------------------------------------------------------
 -- pick the trader up and store in the players inventory;
+-----------------------------------------------------------------------------------------------------
 -- the traders data will be saved and he can be placed at another location
 mobf_trader.pick_trader_up     = function( self, player, menu_path )
 
@@ -1070,7 +1234,9 @@ mobf_trader.pick_trader_up     = function( self, player, menu_path )
 end
 
 
+-----------------------------------------------------------------------------------------------------
 -- formspec input received
+-----------------------------------------------------------------------------------------------------
 mobf_trader.form_input_handler = function( player, formname, fields)
 
 	-- are we responsible to handle this input?
@@ -1115,7 +1281,9 @@ minetest.register_on_player_receive_fields( mobf_trader.form_input_handler );
 
 
 
+-----------------------------------------------------------------------------------------------------
 -- initialize a newly created trader
+-----------------------------------------------------------------------------------------------------
 mobf_trader.initialize_trader = function( self, trader_name, trader_typ, trader_owner, trader_home_pos)
 
 	-- does this typ of trader actually exist?
@@ -1404,7 +1572,7 @@ minetest.register_craftitem("mobf_trader:trader_item", {
 		self.trader_sold      = data.trader_sold; 
 		self.trader_id        = data.trader_id;
 		self.trader_texture   = data.trader_texture;
-		self.trader_goods     = {},
+		self.trader_goods     = data.trader_goods;
 		self.object:set_properties( { textures = { data.trader_texture }});
 
 		-- the trader was placed at a new location
