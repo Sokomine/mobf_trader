@@ -18,12 +18,18 @@ mob_trading.MAX_ALTERNATE_PAYMENTS    = 6; -- up to 6 diffrent payments are poss
 -- how many nodes does the trader of the type individual search for locked chests?
 mob_trading.LOCKED_CHEST_SEARCH_RANGE = 3;
 
+mob_trading.KNOWN_LOCKED_CHESTS = {'default:chest_locked',        'locks:shared_locked_chest', 
+				 'technic:iron_locked_chest',   'technic:copper_locked_chest',
+				 'technic:silver_locked_chest', 'technic:gold_locked_chest'};
+
 -- pseudo-item so that something can be entered when money from the money mod (which does not exist as an item) is requested
 mob_trading.MONEY_ITEM   = 'money';
 -- same for the money2 mod
 mob_trading.MONEY2_ITEM  = 'money2';
 
 
+-- store temporal lists, especially for limits (sell if more than/buy if less than)
+mob_trading.tmp_lists = {};
 
 
 
@@ -41,6 +47,9 @@ mob_trading.MONEY2_ITEM  = 'money2';
 --      self.trader_goods     required for traders of the typ individual; else determined through self.trader_typ
 --      self.trader_owner     required for traders of the typ individual
 --      self.trader_sold      used for collecting statistics
+-- Optional:
+--      self.trader_inv       helper variable that will contain a reference to the trader chest's inventory; will be set automaticly
+--      self.trader_limit     will be used if set; may contain self.trader_limit.sell_if_more[ item name ] and self.trader_limit.buy_if_less[ item name ]
 mob_trading.show_trader_formspec = function( self, player, menu_path, fields )
 
 	if( not( self ) or not( player )) then
@@ -113,6 +122,21 @@ mob_trading.show_trader_formspec = function( self, player, menu_path, fields )
 		menu_path[2] = nil;
 	end
 
+	-- configure the trade limits for a trader
+	if( menu_path and #menu_path > 1 and (menu_path[2]=='limits' or menu_path[2]=='limitlist' or menu_path[2]=='limitstore')) then 
+
+		-- find out how many of each item is availabe
+		local counted_inv = nil;
+		if( self.trader_typ == 'individual' and self.trader_owner) then
+			mob_trading.find_trader_inv( self );
+			counted_inv = mob_trading.count_trader_inv( self );
+		end
+	
+		mob_trading.show_trader_formspec_limits( self, player, menu_path, fields, trader_goods, npc_id, pname, counted_inv );
+		-- the function above already displayed a formspec; nothing more to do here
+		return;
+	end
+
 
 	-- the player wants to delete a trade offer
 	if( menu_path and #menu_path > 1 and menu_path[2]=='delete') then
@@ -124,7 +148,7 @@ mob_trading.show_trader_formspec = function( self, player, menu_path, fields )
 		if( edit_nr and edit_nr > 0 and edit_nr <= #trader_goods ) then
 			table.remove( trader_goods, edit_nr );
 			self.trader_goods       = trader_goods;
-			minetest.chat_send_player( pname, 'Deleted. This trade is no longer offered.');
+			minetest.chat_send_player( pname, self.trader_name..': Deleted. This trade is no longer offered.');
 		end
 		-- display all offers (minus the deleted one)
 		menu_path[2] = nil;
@@ -149,7 +173,7 @@ mob_trading.show_trader_formspec = function( self, player, menu_path, fields )
 			formspec = formspec..
 				'textarea[1.0,1.6;9,0.5;info;;'..minetest.formspec_escape( error_msg  )..']';
 			-- send the player a chat message as well
-			minetest.chat_send_player( pname, error_msg );
+			minetest.chat_send_player( pname, self.trader_name..': '..error_msg );
 		end
 	end
 
@@ -199,6 +223,9 @@ mob_trading.show_trader_formspec = function( self, player, menu_path, fields )
 	end
 
 	-- intorduce the trader
+	if( not( self.trader_name )) then
+		self.trader_name = 'Nameless trader';
+	end
 	local greeting1 = 'My name is '..tostring( self.trader_name or 'uniportant')..'.';
 	local greeting2 = 'I sell the following:';
 
@@ -222,8 +249,6 @@ mob_trading.show_trader_formspec = function( self, player, menu_path, fields )
 		             'label[6.5,'..(0.5+m_up)..';'..minetest.formspec_escape( greeting3 )..']'..
 		             'label[0.2,'..(1.5+m_up)..';Goods:]';
 
-
-
 	-- the owner and people with the trader_take priv can pick the trader up
 	-- (he will end up in the inventory and can then be placed elsewhere)
 	if( (self.trader_owner and self.trader_owner == pname)
@@ -231,13 +256,23 @@ mob_trading.show_trader_formspec = function( self, player, menu_path, fields )
 
 		formspec = formspec..'button_exit[9,0.5;1,0.5;'..npc_id..'_take;Take]';
 	end
+	-- only the owner can edit the limits
+	if(  self.trader_owner and self.trader_owner == pname and self.trader_typ=='individual') then
+		formspec = formspec..'button_exit[9,1.0;1,0.5;'..npc_id..'_limits;Limits]';
+	end
 
+	-- find out how many of each item is availabe
+	local counted_inv = nil;
+	if( self.trader_typ == 'individual' and self.trader_owner) then
+		mob_trading.find_trader_inv( self );
+		counted_inv = mob_trading.count_trader_inv( self );
+	end
 	
 	-- show the goods the trader has to offer
 	for i,v in ipairs( trader_goods ) do
 
 		formspec = formspec..mob_trading.show_trader_formspec_item_list(
-				((i-1)%8)+1, math.floor((i-1)/8)*1.2+(1.0+m_up), v[1], i, npc_id, 0.4, 0.4, 0.6);
+				((i-1)%8)+1, math.floor((i-1)/8)*1.2+(1.0+m_up), v[1], i, npc_id, 0.4, 0.4, 0.6, counted_inv, true, self);
 	end
 
 
@@ -268,7 +303,7 @@ mob_trading.show_trader_formspec = function( self, player, menu_path, fields )
 					'label[3.0,'..(3.00+p_up)..';Select what you want to give:]'..
 
 					mob_trading.show_trader_formspec_item_list(
-						0, 4.0+p_up-0.6, trade_details[1], menu_path[2], npc_id, 1.0, 1.0, 1 )..
+						0, 4.0+p_up-0.6, trade_details[1], menu_path[2], npc_id, 1.0, 1.0, 1, counted_inv, true, self )..
 						'box[-0.15,'..(4.0+p_up-0.70)..';2.1,2.4;#00AA00]';
 			else
 				formspec = formspec..
@@ -276,7 +311,7 @@ mob_trading.show_trader_formspec = function( self, player, menu_path, fields )
 					'box[0.25,'..(3.8+p_up)..';1.75,1.10;#00AA00]'..
 
 					mob_trading.show_trader_formspec_item_list(
-						0.5, 4.0+p_up-0.6, trade_details[1], menu_path[2], npc_id, 1.0, 1.0, 1 );
+						0.5, 4.0+p_up-0.6, trade_details[1], menu_path[2], npc_id, 1.0, 1.0, 1, counted_inv, true, self );
 			end
 
 
@@ -307,14 +342,14 @@ mob_trading.show_trader_formspec = function( self, player, menu_path, fields )
 							 npc_id..'_'..tostring( i )..';Payment '..tostring(i-1)..']'..
 
 							mob_trading.show_trader_formspec_item_list(
-								((i-1)*2.40), 4.0+p_up-0.6, trade_details[i], i, npc_id, 1.0, 1.0, 1 )..
+								((i-1)*2.40), 4.0+p_up-0.6, trade_details[i], i, npc_id, 1.0, 1.0, 1, counted_inv, false, self )..
 								'box['..(-0.15+((i-1)*2.40))..','..(4.0+p_up-0.70)..';2.1,2.4;'..boxcolor..']';
 					else
 						formspec = formspec..
 							'label['..((i)*1.2-0.3)..','..(4.0+p_up)..';'..or_or_for..']'..
 							'box['..((i*1.2)-0.34)..','..(3.8+p_up)..';1.15,1.10;'..boxcolor..']'..
 							mob_trading.show_trader_formspec_item_list(
-								((i*1.2)-0.5), 4.0+p_up-0.6, trade_details[i], i, npc_id, 1.0, 1.0, 1 );
+								((i*1.2)-0.5), 4.0+p_up-0.6, trade_details[i], i, npc_id, 1.0, 1.0, 1, counted_inv, false, self );
 					end
 				end
 			end
@@ -322,12 +357,12 @@ mob_trading.show_trader_formspec = function( self, player, menu_path, fields )
 
 		if( #menu_path >= 3 ) then
 
-			local res = mob_trading.do_trade( self, player, menu_path, trade_details );
+			local res = mob_trading.do_trade( self, player, menu_path, trade_details, counted_inv );
 
 			if( res.msg ) then
 				formspec = formspec..
 					'textarea[1.0,5.1;8,1.0;info;;'..( minetest.formspec_escape( res.msg ))..']';
-				minetest.chat_send_player( pname, res.msg );
+				minetest.chat_send_player( pname, self.trader_name..': '..res.msg );
 			end
 			if( res.success ) then
 				formspec = formspec..
@@ -341,10 +376,10 @@ mob_trading.show_trader_formspec = function( self, player, menu_path, fields )
 			-- show how much of these items/packages have been sold already
 			if(    self.trader_sold
 			   and self.trader_sold[ trade_details[ 1 ]]) then
-				formspec = formspec..'label[9.0,'..(4.0+p_up)..';Sold: '..
+				formspec = formspec..'label[9.0,'..(3.9+p_up)..';Sold: '..
 					tostring( self.trader_sold[ trade_details[ 1 ]] )..']';
 			else
-				formspec = formspec..'label[9.0,'..(4.0+p_up)..';Sold: -';
+				formspec = formspec..'label[9.0,'..(3.9+p_up)..';Sold: -]';
 			end
 		end
 	end
@@ -355,8 +390,15 @@ end
 
 
 
--- helper function
-mob_trading.show_trader_formspec_item = function( offset_x, offset_y, stack_desc, nr, prefix, size )
+-- TODO: use can_trade instead of duplicating checks here?
+--------------------------------------------------------------------------
+-- show an image button for *one* item stack that is part of a trade offer
+--------------------------------------------------------------------------
+-- helper function;
+-- if there is enough space (only one stack offered or one offer selected), the amount of items in that stack will be shown as a label;
+-- additional information such as "SOLD OUT" is added so that it becomes immmediately obvious if the trade is not possible;
+-- self.trader.trader_limit is used
+mob_trading.show_trader_formspec_item = function( offset_x, offset_y, text_offset_x, text_offset_y, stack_desc, nr, prefix, size, counted_inv, is_offer, self )
 
 	local stack = ItemStack( stack_desc );
 	local anz   = stack:get_count();
@@ -369,33 +411,84 @@ mob_trading.show_trader_formspec_item = function( offset_x, offset_y, stack_desc
 		label = '';
 	end
 	
-	-- do not show unknown blocks
-	if( minetest.registered_items[ name ] ) then
-
-		if( name==mob_trading.MONEY_ITEM or name==mob_trading.MONEY2_ITEM) then
-			return 'image_button['..offset_x..','..offset_y..';'..size..','..size..';'..
+	-- TODO: in case of money, there is no check yet weather the side concerned can afford the trade
+	if( name==mob_trading.MONEY_ITEM or name==mob_trading.MONEY2_ITEM) then
+		return { text='image_button['..offset_x..','..offset_y..';'..size..','..size..';'..
 -- TODO: create placeholder texture for money: mobf_trader_money.png
-				'mobf_trader_money.png;false;true]'..
-				label;
-		else
-			return	'item_image_button['..offset_x..','..offset_y..';'..size..','..size..';'..
-				( name or '?')..';'..
-				prefix..'_'..tostring( nr )..';]'..
-				label;
---			return	'item_image['..offset_x..','..offset_y..';'..size..','..size..';'..
---				( name or '?')..']'..
---				label;
+			      'mobf_trader_money.png;'..
+			      prefix..'_'..tostring( nr )..';;;]'..
+			      label,
+			 error_msg = '',
+			 anz_avail = 0 };
+	end
+
+	-- do not show unknown blocks
+	if( not( minetest.registered_items[ name ] )) then
+		return { text='', error_msg='', anz_avail=0};
+	end
+
+	local error_msg = '';
+	local anz_avail = 0;
+
+	if( counted_inv and self and self.trader_inv) then
+		if(     is_offer
+		   -- no more in stock
+		   and (   (not(counted_inv[name]) or counted_inv[name]<anz )
+		        or (     self.trader_limit 
+                             and self.trader_limit.sell_if_more
+			     and self.trader_limit.sell_if_more[ name ] 
+		             -- ...or less than what the trader is supposed to keep as a reserve
+			     and self.trader_limit.sell_if_more[ name ] > (counted_inv[name]-anz) ))) then 
+			error_msg = 'label['..(text_offset_x+0.05)..','..(text_offset_y-0.05)..';SOLD]'..
+			            'label['..(text_offset_x+0.10)..','..(text_offset_y+0.15)..';OUT]';
+			anz_avail = 0;
+
+		elseif( is_offer ) then
+			error_msg = '';
+			-- how many more of these items are on sale?
+		        if (     self.trader_limit 
+                             and self.trader_limit.sell_if_more
+			     and self.trader_limit.sell_if_more[ name ] ) then
+				anz_avail = math.floor( (counted_inv[name]-self.trader_limit.sell_if_more[ name ]) / anz );
+			else
+				anz_avail = math.floor( (counted_inv[name]) / anz );
+			end
+
+		-- is there enough free space?
+		elseif( not(is_offer) and not( self.trader_inv:room_for_item( 'main', stack ))) then
+			error_msg = 'label['..(text_offset_x+0.30)..','..(text_offset_y-0.25)..';NO]'..
+			            'label['..(text_offset_x+0.10)..','..(text_offset_y-0.05)..';SPACE]'..
+			            'label['..(text_offset_x+0.15)..','..(text_offset_y+0.15)..';LEFT]';
+
+		-- upper storage limit reached
+		elseif( not(is_offer)
+		        and self.trader_limit 
+                        and self.trader_limit.buy_if_less
+			and self.trader_limit.buy_if_less[ name ] 
+		        -- only buy up to buy_if_less items of this kind
+			and self.trader_limit.buy_if_less[ name ] < (counted_inv[name]+anz)) then 
+
+			error_msg = 'label['..(text_offset_x     )..','..(text_offset_y-0.05)..';NO MORE]'..
+			            'label['..(text_offset_x+0.05)..','..(text_offset_y+0.15)..';WANTED]';
 		end
 	end
-	return '';
+
+	return { text='item_image_button['..offset_x..','..offset_y..';'..size..','..size..';'..
+		      ( name or '?')..';'..
+		      prefix..'_'..tostring( nr )..';]'..
+		      -- SOLD OUT etc. have to be seperate labels instead of labels of the item_image_buttons because
+		      -- the item_image_buttons can't handle multiple lines of text
+		      label,
+		 error_msg = error_msg,
+		 anz_avail = anz_avail };
 end
 
 
--- shows up to four items
+--------------------------------------------------------------------------
+-- shows the complete offer (consisting of up to 4 seperate stacks)
+--------------------------------------------------------------------------
 -- set stretch_x and stretch_y to 0.4 each plus quarter_botton_size to 0.6 in order to make everything fit into one formspec
-mob_trading.show_trader_formspec_item_list = function( offset_x, offset_y, stack_desc, nr, prefix, stretch_x, stretch_y, quarter_button_size )
-
--- TODO: show "sold out" if no longer availabe?
+mob_trading.show_trader_formspec_item_list = function( offset_x, offset_y, stack_desc, nr, prefix, stretch_x, stretch_y, quarter_button_size, counted_inv, is_offer, self )
 
 	-- show multiple items
 	if( type( stack_desc )=='table') then
@@ -413,10 +506,26 @@ mob_trading.show_trader_formspec_item_list = function( offset_x, offset_y, stack
 			offset_x = offset_x + 0.5*stretch_x;
 		end
 			
+		local error_msg = '';
+		local error_msg_offset = 0;
+		local anz_avail = 1000;
+		if( stretch_x > 0.7 ) then
+			error_msg_offset = 0.65;
+		end
 		for i = 1,k do
 
-			formspec = formspec..
-				mob_trading.show_trader_formspec_item(offset_x+(a*stretch_x), offset_y+(b*stretch_y), stack_desc[i], nr, prefix, quarter_button_size );
+			local res = mob_trading.show_trader_formspec_item(offset_x+(a*stretch_x), offset_y+(b*stretch_y),
+					offset_x+error_msg_offset, offset_y+error_msg_offset,
+					stack_desc[i], nr, prefix, quarter_button_size, counted_inv, is_offer, self );
+			formspec = formspec..res.text;
+			-- make sure the error_msg (i.e. 'SOLD OUT') is printed last - and not covered by other images
+			if( res.error_msg ~= '' ) then
+				error_msg = res.error_msg;
+			end
+			-- the item of which the least amount is available determines how many packages can be sold
+			if( res.anz_avail < anz_avail ) then
+				anz_avail = res.anz_avail;
+			end
 
 			if(    i==1) then a = 1; b = 0; -- 2nd: upper right corner
 			elseif(i==2) then a = 1; b = 1; -- 3rd: lower right corner
@@ -428,7 +537,11 @@ mob_trading.show_trader_formspec_item_list = function( offset_x, offset_y, stack
 				a = 0;
 			end
 		end
-		return formspec;
+-- TODO: it is possible that a trade may be impossible due to not enough free inv slots to ensure successful transfer of all stacks
+		if( stretch_x > 0.7 and is_offer and anz_avail>0) then
+			formspec = formspec..'label[9.0,'..(offset_y+0.75)..';Left: '..tostring(anz_avail)..']';
+		end
+		return formspec..error_msg;
 	else
 
 		-- put the only image we have to display in a central position
@@ -437,58 +550,11 @@ mob_trading.show_trader_formspec_item_list = function( offset_x, offset_y, stack
 			offset_y = offset_y + quarter_button_size/2;
 		end
 
-		return mob_trading.show_trader_formspec_item( offset_x, offset_y, stack_desc, nr, prefix, 1 );
-	end
-end
-
-
-
--- this is only relevant for the trader of the typ "individual"
--- (that trader uses player-owned chests to store the trade goods)
-mob_trading.show_storage_formspec = function( self, player, menu_path )
-
-	local pos = self.object:getpos();
-	local RANGE = mob_trading.LOCKED_CHEST_SEARCH_RANGE;
-
-	-- search for locked chest from default, locks mod and technic mod chests
-	-- ignore technic mithril chests as those are not locked
-	local chest_list = minetest.find_nodes_in_area(
-		{ x=(pos.x-RANGE), y=(pos.y-RANGE), z=(pos.z-RANGE )},
-		{ x=(pos.x+RANGE), y=(pos.y+RANGE), z=(pos.z+RANGE )},
-		{'default:chest_locked',        'locks:shared_locked_chest', 
-		 'technic:iron_locked_chest',   'technic:copper_locked_chest',
-		 'technic:silver_locked_chest', 'technic:gold_locked_chest'});
-
-	local all_chest_inv = {};
-	local sum_chest_inv = {};
-	for _, p in ipairs( chest_list ) do
-
-		local node  = minetest.get_node( p );
-		local meta  = minetest.get_meta( p );
-		local owner = meta:get_string( 'owner' );
-
-		if( owner and owner==player:get_player_name() ) then
-			
-			local inv = meta:get_inventory();
-
-			for i = 1,inv:get_size('main') do
-
-				local stack = inv:get_stack( 'main', i );
-				if( not( stack:is_empty() )) then
-			
-					local stack_name = stack:get_name();
-					if( not( sum_chest_inv[ stack_name ] )) then
-						sum_chest_inv[ stack_name ] = stack:get_count();
-					else
-						sum_chest_inv[ stack_name ] = sum_chest_inv[ stack_name ] + stack:get_count();
-					end
-				end
-			end
+		local res = mob_trading.show_trader_formspec_item( offset_x, offset_y, offset_x, offset_y, stack_desc, nr, prefix, 1, counted_inv, is_offer, self );
+		if( stretch_x > 0.7 and is_offer and res.anz_avail>0) then
+			res.text = res.text..'label[9.0,'..(offset_y+0.25)..';Left: '..tostring(res.anz_avail)..']';
 		end
-	end
-
-	for k,v in pairs( sum_chest_inv ) do
-		minetest.chat_send_player( player:get_player_name(), 'FOUND '..tostring( k )..' anz:'..tostring( v));
+		return res.text .. res.error_msg;
 	end
 end
 
@@ -563,7 +629,7 @@ mob_trading.store_trade_offer_changes = function( self, pname,  menu_path, field
 		self.trader_goods = trader_goods;
 			
 		-- display the newly stored offer
-		minetest.chat_send_player( pname, 'Your new offer has been added.');
+		minetest.chat_send_player( pname, self.trader_name..': Your new offer has been added.');
 
 		-- make sure the new offer is selected and displayed when this function here continues
 		menu_path[2] = #trader_goods;
@@ -575,7 +641,7 @@ mob_trading.store_trade_offer_changes = function( self, pname,  menu_path, field
 		if( edit_nr and edit_nr > 0 and edit_nr <= #trader_goods ) then
 			trader_goods[ edit_nr ] = offer;
 			self.trader_goods       = trader_goods;
-			minetest.chat_send_player( pname, 'The offer has been changed.');
+			minetest.chat_send_player( pname, self.trader_name..': The offer has been changed.');
 		end
 		-- display the modified offer
 		menu_path[2] = edit_nr;
@@ -583,6 +649,190 @@ mob_trading.store_trade_offer_changes = function( self, pname,  menu_path, field
 		return '';
 	end
 	return 'Error: Unknown command.';
+end
+
+
+
+-------------------------------------------------------------------------------
+-- helper function for mob_trading.show_trader_limits;
+-- changes the table items
+mob_trading.insert_item_limitation = function( items, k, i, v )
+	if( i<1 or i>4) then
+		return;
+	end
+	if( not( items[ k ] )) then
+		-- 0 in stock; sell if more than 0; buy if less than 10000; item is part of a trade offer
+		items[ k ] = { 0, 0, 10000, false };
+	end
+	items[ k ][ i ] = v;
+end
+
+
+-------------------------------------------------------------------------------
+-- display and allow configuration of self.trader_limit
+-------------------------------------------------------------------------------
+mob_trading.show_trader_formspec_limits = function( self, player, menu_path, fields, trader_goods, npc_id, pname, counted_inv )
+
+	local items = {};
+
+	if( not( self.trader_limit )) then
+		self.trader_limit = {};
+	end
+	if( not( self.trader_limit.sell_if_more )) then
+		self.trader_limit.sell_if_more = {};
+	end
+	if( not( self.trader_limit.buy_if_less )) then
+		self.trader_limit.buy_if_less = {};
+	end
+
+
+	local selected = 2;
+	-- store the new limits
+	if( #menu_path > 2 and menu_path[2]=='limitstore' and fields['SellIfMoreThan'] and fields['BuyIfLessThan']
+		and mob_trading.tmp_lists[ pname ] and #mob_trading.tmp_lists[ pname ] >= tonumber( menu_path[3] )
+		and tonumber( menu_path[3] )>0) then
+		
+			local selected = mob_trading.tmp_lists[ pname ][ tonumber(menu_path[3]) ];
+
+			local anz = tonumber(fields['SellIfMoreThan']);
+			if( anz > 0 and anz < 10000 ) then
+				self.trader_limit.sell_if_more[ selected ] = anz;
+			end
+
+			anz = tonumber(fields['BuyIfLessThan']);
+			if( anz > 0 and anz < 10000 ) then
+				self.trader_limit.buy_if_less[ selected ] = anz;
+			end
+	end
+
+
+	-- everything the trader has in his chest is a candidate for trading
+	if( not( counted_inv )) then
+		counted_inv = {};
+	end
+	for k,v in pairs( counted_inv ) do
+		mob_trading.insert_item_limitation( items, k, 1, v );
+	end
+
+	-- everything that's in one of the offers the trader makes
+	for j,w in ipairs( self.trader_goods ) do -- for all trade offer
+		for i,v in ipairs( w ) do -- for one particular trade offer and all possible payments
+			if( type( v )=='table' ) then 
+				for _,s in ipairs( v ) do -- for all items that are part of a trade
+					mob_trading.insert_item_limitation( items, ItemStack(s):get_name(), 4, true );
+				end
+			else -- only one item is offered
+				mob_trading.insert_item_limitation(         items, ItemStack(s):get_name(), 4, true);
+			end
+		end
+	end
+
+	-- everything for which there's already a self.trader_limit.sell_if_more limit
+	for k,v in pairs( self.trader_limit.sell_if_more ) do
+		mob_trading.insert_item_limitation( items, k, 2, v );
+	end
+
+	-- everything for which there's already a self.trader_limit.buy_if_less limit
+	for k,v in pairs( self.trader_limit.buy_if_less ) do
+		mob_trading.insert_item_limitation( items, k, 3, v );
+	end
+	
+
+
+	-- show the input form for new limits
+	if( fields[ npc_id..'_limitlist' ] ) then
+		local selection =  minetest.explode_table_event( fields[ npc_id..'_limitlist' ] );
+		if( selection and selection['row']) then
+			selected = selection['row'];
+		end
+
+		if( (selection['type'] == 'DCL' or selection['type'] == 'CHG')
+		   and mob_trading.tmp_lists[ pname ] and #mob_trading.tmp_lists[ pname ] >= selected ) then
+
+			local selected_item = mob_trading.tmp_lists[ pname ][ selected ];
+
+			local formspec = 'size[6,4]'..
+				'item_image[0.0,1.0;1.0,1.0;'..selected_item..']'..
+				'label[1.0,0.0;Set limits for buy and sell]'..
+				'label[1.5,0.5;Description:]'..
+					'label[3.5,0.5;'..( minetest.registered_items[ selected_item ].description or '?' )..']'..
+				'label[1.5,1.0;Item name:]'..
+					'label[3.5,1.0;'..tostring( selected_item )..']'..
+				'label[1.5,1.5;In stock:]'..
+					'label[3.5,1.5;'..tostring( items[ selected_item ][1] )..']'..
+				'label[1.5,2.0;Sell if more than]'..
+					'field[3.5,2.5;1.2,0.5;SellIfMoreThan;;'..tostring( items[ selected_item ][2] )..']'..
+						'label[4.5,2.0;are in stock.]'..
+				'label[1.5,2.5;Buy if less than]'..
+					'field[3.5,3.0;1.2,0.5;BuyIfLessThan;;'..tostring( items[ selected_item ][3] )..']'..
+						'label[4.5,2.5;are in stock.]'..
+				'button[0.5,3.5;2,0.5;'..npc_id..'_limitstore_'..tostring(selected)..';Store]'..
+				'button[3.0,3.5;2,0.5;'..npc_id..'_limitlist;Abort]';
+
+			minetest.show_formspec( pname, "mob_trading:trader", formspec );
+			return;
+		end
+	end
+
+	-- all items for which limitations might possibly be needed have been collected;
+	-- now display them
+	local formspec = 'size[12,12]'..
+			'button[4.0,2.0;2,0.5;'..npc_id..'_main;Back]'..
+			'tablecolumns[' ..
+--			'image;'..
+			      'text,align=left;'..
+			'color;text,align=right;'..
+			'color;text,align=center;'..
+			      'text,align=right;'..
+			'color;text,align=center;'..
+			      'text,align=right;'..
+			'color;text,align=left]'..
+                        'table[0.1,2.7;11.4,8.8;'..npc_id..'_limitlist;';
+
+	if( not( mob_trading.tmp_lists[ pname ])) then
+		mob_trading.tmp_lists[ pname ] = {};
+	end
+	local col = 0;
+	local row = 2;
+	for k,v in pairs( items ) do
+	
+		table.insert( mob_trading.tmp_lists[ pname ], k );
+		local c1 = '#FF0000';
+		if( v[1] > 0 ) then
+			c1 = '#BBBBBB';
+		end
+		local t1 = 'sell always';
+		local c2 = '#006600';
+		if( v[2] > 0 ) then
+			c2 = '#00FF00';
+			t1 = 'sell if more than:';
+		end
+		local t2 = 'buy always';
+		local c3 = '#666600';
+		if( v[3] ~= 10000 ) then
+			c3 = '#FFFF00';
+			t2 = 'buy if less than:';
+		end
+
+		local desc = '';
+		if( k =="" ) then
+			desc = '<empty inventory slot>';
+			k    = '<nothing>';
+		elseif( minetest.registered_items[ k ] 
+		    and minetest.registered_items[ k ].description ) then
+			desc = minetest.registered_items[ k ].description;
+		end
+
+		formspec = formspec..
+			desc..','..
+			c1..','..         tostring( v[1] )..','..
+			c2..','..t1..','..tostring( v[2] )..','..
+			c3..','..t2..','..tostring( v[3] )..',#AAAAAA,'..k..',';
+	end
+	formspec = formspec..';'..selected..']';
+
+	-- display the formspec
+	minetest.show_formspec( pname, "mob_trading:trader", formspec );
 end
 
 
@@ -722,7 +972,7 @@ end
 -- If the other side is an admin shop/trader with unlimited supply:
 --          receiver_name has to be nil or '' and  receiver_inv has to be empty for unlmiited trade
 -- The function uses recursion in case of table value for price_stack_str and calls itshelf for each price part.
-mob_trading.can_trade = function( price_stack_str, debtor_name, debtor_inv, receiver_name, receiver_inv, player_is_debtor )
+mob_trading.can_trade = function( price_stack_str, debtor_name, debtor_inv, receiver_name, receiver_inv, player_is_debtor, counted_inv, self )
 
 	-- we've got multiple items to care for
 	if( type( price_stack_str )=='table' ) then
@@ -749,7 +999,7 @@ mob_trading.can_trade = function( price_stack_str, debtor_name, debtor_inv, rece
 		local price_types  = {};
 		for k,v in pairs( items ) do
 			-- recursively check if payment is possible
-			local res = mob_trading.can_trade( k..' '..tostring( v ), debtor_name, debtor_inv, receiver_name, receiver_inv, player_is_debtor );
+			local res = mob_trading.can_trade( k..' '..tostring( v ), debtor_name, debtor_inv, receiver_name, receiver_inv, player_is_debtor, counted_inv, self );
 			-- if a part cannot be paid, the whole trade cannot be made
 			if( res.error_msg ) then
 				return res;
@@ -840,10 +1090,34 @@ mob_trading.can_trade = function( price_stack_str, debtor_name, debtor_inv, rece
 		-- does the debtor have the item? 
 		if(       debtor_inv and not( debtor_inv:contains_item("main", price_stack ))) then
 			error_msg = 'no_item';
+
+		-- does the trader have more than sell_if_more of the item requested?
+		elseif(   debtor_inv
+		      and counted_inv
+ 		      and not( player_is_debtor )
+		      and self.trader_limit 
+                      and self.trader_limit.sell_if_more
+		      and self.trader_limit.sell_if_more[ price_stack_name ] 
+		      -- less than what the trader is supposed to keep as a reserve
+		      and self.trader_limit.sell_if_more[ price_stack_name ] > (counted_inv[ price_stack_name ]-price_stack_count) ) then 
+			error_msg = 'no_intrest';
+		     
+		-- does the trader want any more of this kind of payment?
+		elseif(   debtor_inv
+		      and counted_inv
+ 		      and player_is_debtor
+		      and self.trader_limit 
+                      and self.trader_limit.buy_if_less
+		      and self.trader_limit.buy_if_less[ price_stack_name ] 
+		      -- less than what the trader is supposed to keep as a reserve
+		      and self.trader_limit.buy_if_less[ price_stack_name ] < (counted_inv[ price_stack_name ]+price_stack_count) ) then 
+			error_msg = 'no_intrest';
+
 		-- does the receiver have enough free room to take the item?
 		elseif( receiver_inv and not( receiver_inv:room_for_item("main", price_stack ))) then
 			error_msg = 'no_space';
 		end
+
 	end
 
 
@@ -887,6 +1161,14 @@ mob_trading.can_trade = function( price_stack_str, debtor_name, debtor_inv, rece
 		else
 			error_msg = 'You do not have enough free space in your inventory for '..tostring( price_desc )..'.';
 		end
+
+	-- in case the self.trader_limit.* values prevent the trader from trading
+	elseif( error_msg == 'no_intrest') then
+		if( player_is_debtor) then
+			error_msg = 'Sorry, I am not intrested in any more '..tostring( price_desc )..' right now. Please come back later!';
+		else
+			error_msg = 'Sorry, but I do not have any '..tostring( price_desc )..' left I\'m willing to sell. Please come back later!';
+		end
 	end
 
 
@@ -900,7 +1182,7 @@ end
 -- moves stack from source_inv to target_inv;
 --     if either does not exist, the stack is removed (i.e. with traders that are not of type individual)
 -----------------------------------------------------------------------------------------------------
-mob_trading.move_trade_goods = function( source_inv, target_inv, stack )
+mob_trading.move_trade_goods = function( source_inv, target_inv, stack, player, self )
 
 	local stacks_removed = {};
 
@@ -941,10 +1223,20 @@ mob_trading.move_trade_goods = function( source_inv, target_inv, stack )
 
 			-- in case nothing was added to target_inv: an error occoured (i.e. target_inv full)
 			if( not( leftover:is_empty())
-			    and (leftover:get_count() >= remaining_stack():get_count())) then
-			-- TODO: do something more here?
-minetest.chat_send_player('singleplayer','ERROR: FAILED TO ADD '..tostring( leftover:get_name()..' '..leftover:get_count()));
-				return false;
+			    and (leftover:get_count() >= remaining_stack:get_count())) then
+
+				-- tell the player to take a look
+				minetest.chat_send_player( player:get_player_name(), self.trader_name..': '..
+					'You do not have enough free space in your inventory. '..
+					'Therefore, '..leftover:get_count()..'x '..leftover:get_name()..' have been dropped at where you stand.');
+				-- place the item stack at the position where the player is standing
+				minetest.add_item( player:getpos(), remaining_stack );
+				-- the stack was dropped completely
+				leftover:set_count(0);
+				if( not( leftover:is_empty())) then
+					minetest.chat_send_player( player:get_player_name(), self.trader_name..': ERROR: Failed to drop the items at your feet!');
+					return;
+				end
 			end
 			remaining_stack = leftover;
 		end
@@ -955,12 +1247,68 @@ end
 
 
 -----------------------------------------------------------------------------------------------------
+-- locates a locked chest owned by the given trader and returns the inventory;
+--    sets self.trader_inv to the inventory
+-----------------------------------------------------------------------------------------------------
+mob_trading.find_trader_inv = function( self )
+	if( not( self ) or not( self.object )) then
+		return nil;
+	end
+	local RANGE = mob_trading.LOCKED_CHEST_SEARCH_RANGE;
+	local tpos = self.object:getpos(); -- current position of the trader
+	-- search for locked chest from default, locks mod and technic mod chests
+	-- ignore technic mithril chests as those are not locked
+	local chest_list = minetest.find_nodes_in_area(
+		{ x=(tpos.x-RANGE), y=(tpos.y-RANGE), z=(tpos.z-RANGE )},
+		{ x=(tpos.x+RANGE), y=(tpos.y+RANGE), z=(tpos.z+RANGE )},
+		mob_trading.KNOWN_LOCKED_CHESTS );
+	for _, p in ipairs( chest_list ) do
+		local meta = minetest.get_meta( p );
+		if( meta and meta:get_string('owner') and meta:get_string('owner')==self.trader_owner ) then
+			self.trader_inv = meta:get_inventory();
+			return self.trader_inv;
+		end
+	end
+	return nil;
+end
+
+
+-----------------------------------------------------------------------------------------------------
+-- count how many items of each type the trader has in his chest
+-----------------------------------------------------------------------------------------------------
+--      empty stacks are counted under the key ""; for other items, the amount of items of each type is counted
+mob_trading.count_trader_inv = function( self )
+	if( not( self.trader_inv )) then
+		return {};
+	end
+	local anz = self.trader_inv:get_size('main');
+	local stored = {};
+	for i=1, anz do
+		local stack = self.trader_inv:get_stack('main', i );
+		local name = stack:get_name();
+		local count = stack:get_count();
+		-- count empty stacks 
+		if( name=="" ) then
+			count = 1;
+		end
+		-- count how much of each item is there
+		if( not( stored[ name ])) then
+			stored[ name ] = count;
+		else
+			stored[ name ] = stored[ name ] + count;
+		end
+	end
+	return stored;
+end
+
+
+-----------------------------------------------------------------------------------------------------
 -- check if payment and trade are possible; do the actual trade
 -----------------------------------------------------------------------------------------------------
 -- self ought to contain: trader_id, trader_typ, trader_owner, trader_home_pos, trader_sold (optional - for statistics)
 -- traders of the type 'individual' who do have owners will search their environment for chests owned by their owner;
 --      said chests contain the stock of the trader
-mob_trading.do_trade = function( self, player, menu_path, trade_details )
+mob_trading.do_trade = function( self, player, menu_path, trade_details, counted_inv )
 
 	if( not( self ) or not( player ) or not( menu_path ) or #menu_path < 3) then
 		return {msg='', success=false};
@@ -980,37 +1328,22 @@ mob_trading.do_trade = function( self, player, menu_path, trade_details )
 	-- traders who do have an owner need to have an inventory somewhere
 	if( self.trader_owner and self.trader_owner ~= '' and self.trader_typ=='individual') then
 
-		local RANGE = mob_trading.LOCKED_CHEST_SEARCH_RANGE;
-		local tpos = self.object:getpos(); -- current position of the trader
-		-- search for locked chest from default, locks mod and technic mod chests
-		-- ignore technic mithril chests as those are not locked
-		local chest_list = minetest.find_nodes_in_area(
-			{ x=(tpos.x-RANGE), y=(tpos.y-RANGE), z=(tpos.z-RANGE )},
-			{ x=(tpos.x+RANGE), y=(tpos.y+RANGE), z=(tpos.z+RANGE )},
-			{'default:chest_locked',        'locks:shared_locked_chest', 
-			 'technic:iron_locked_chest',   'technic:copper_locked_chest',
-			 'technic:silver_locked_chest', 'technic:gold_locked_chest'});
-		trader_inv = nil;
-		for _, p in ipairs( chest_list ) do
-			meta = minetest.get_meta( p );
-			if( not( trader_inv) and meta and meta:get_string('owner') and meta:get_string('owner')==self.trader_owner ) then
-				trader_inv = meta:get_inventory();
-			end
+		if( not( self.trader_inv )) then
+			self.trader_inv = mob_trading.find_trader_inv( self );
 		end
-
-		if( not( trader_inv )) then
+		if( not( self.trader_inv )) then
 			return {msg='Sorry. I was unable to find my storage chest. Please contact my owner!', success=false};
 		end
 	end
 
 	-- can the player pay the selected payment to the trader?
-	local player_can_trade = mob_trading.can_trade( trade_details[ choice2 ], pname, player_inv, self.trader_owner, trader_inv, true );
+	local player_can_trade = mob_trading.can_trade( trade_details[ choice2 ], pname, player_inv, self.trader_owner, self.trader_inv, true, counted_inv, self );
 	if( player_can_trade.error_msg ) then
 		return {msg=player_can_trade.error_msg, success=false};
 	end
 
 	-- can the trader in turn give the player what the player paid for?
-	local trader_can_trade = mob_trading.can_trade( trade_details[ 1       ], self.trader_owner, trader_inv, pname, player_inv, false );
+	local trader_can_trade = mob_trading.can_trade( trade_details[ 1       ], self.trader_owner, self.trader_inv, pname, player_inv, false, counted_inv, self );
 	if( trader_can_trade.error_msg ) then
 		return {msg=trader_can_trade.error_msg, success=false};
 	end
@@ -1034,7 +1367,7 @@ mob_trading.do_trade = function( self, player, menu_path, trade_details )
 			end
 	
 		elseif( player_can_trade.price_types[i] == 'direct' ) then
-			local res = mob_trading.move_trade_goods( player_inv, trader_inv, player_can_trade.price_stacks[i] );
+			local res = mob_trading.move_trade_goods( player_inv, self.trader_inv, player_can_trade.price_stacks[i], player, self );
 		end
 	end
 
@@ -1053,7 +1386,7 @@ mob_trading.do_trade = function( self, player, menu_path, trade_details )
 			end
 	
 		elseif( trader_can_trade.price_types[i] == 'direct' ) then
-			local res = mob_trading.move_trade_goods( trader_inv, player_inv, trader_can_trade.price_stacks[i] );
+			local res = mob_trading.move_trade_goods( self.trader_inv, player_inv, trader_can_trade.price_stacks[i], player, self );
 		end
 	end
 

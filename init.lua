@@ -373,6 +373,7 @@ mobf_trader.trader_entity_prototype = {
 				trader_id        = self.trader_id,
 				trader_texture   = self.trader_texture,
 				trader_goods     = self.trader_goods,
+				trader_limits    = self.trader_limits,
 			});
 	end,
 
@@ -396,6 +397,7 @@ mobf_trader.trader_entity_prototype = {
 				self.trader_id        = data.trader_id;
 				self.trader_texture   = data.trader_texture;
 				self.trader_goods     = data.trader_goods;
+				self.trader_limits    = data.trader_limits;
 			end
 	
 			if( self.trader_texture ) then
@@ -535,6 +537,7 @@ minetest.register_craftitem("mobf_trader:trader_item", {
 		self.trader_id        = data.trader_id;
 		self.trader_texture   = data.trader_texture;
 		self.trader_goods     = data.trader_goods;
+		self.trader_limits    = data.trader_limits;
 		self.object:set_properties( { textures = { data.trader_texture }});
 
 		-- the trader was placed at a new location
