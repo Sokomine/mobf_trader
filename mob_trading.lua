@@ -415,7 +415,6 @@ mob_trading.show_trader_formspec_item = function( offset_x, offset_y, text_offse
 	-- TODO: in case of money, there is no check yet weather the side concerned can afford the trade
 	if( name==mob_trading.MONEY_ITEM or name==mob_trading.MONEY2_ITEM) then
 		return { text='image_button['..offset_x..','..offset_y..';'..size..','..size..';'..
--- TODO: create placeholder texture for money: mobf_trader_money.png
 			      'mobf_trader_money.png;'..
 			      prefix..'_'..tostring( nr )..';;;]'..
 			      label,
