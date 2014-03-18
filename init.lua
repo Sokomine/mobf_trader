@@ -196,6 +196,57 @@ mobf_trader.pick_trader_up     = function( self, player, menu_path )
 end
 
 
+
+
+-----------------------------------------------------------------------------------------------------
+-- set name and texture of a trader
+-----------------------------------------------------------------------------------------------------
+mobf_trader.config_trader = function( self, player, menu_path, fields, menu_path )
+
+	if( menu_path and #menu_path>3 and menu_path[2]=='config' and menu_path[3]=='texture' ) then
+		local nr = tonumber( menu_path[4] );
+		-- actually set the new texture
+		if( nr and nr > 0 and nr <= #mobf_trader.TEXTURES ) then
+			self.trader_texture = mobf_trader.TEXTURES[ nr ];
+			self.object:set_properties( { textures = { self.trader_texture }});
+		end
+	end
+
+	local formspec = 'size[10,8]'; 
+
+	-- rename a trader
+	if( fields['tradername'] and fields['tradername'] ~= "" and fields['tradername'] ~= self.trader_name ) then
+		minetest.chat_send_player( player:get_player_name(),
+			'Your trader has been renamed from \"'..tostring( self.trader_name )..'\" to \"'..
+			fields['tradername']..'\".');
+		self.trader_name = fields['tradername'];
+		formspec = formspec..'label[3.0,1.5;Renamed successfully.]';
+	end
+
+	local npc_id = self.trader_id;
+	formspec = formspec..
+		'label[3.0,0.0;Configure your trader]'..
+		'label[0.0,1.0;Name of the trader:]'..
+		'label[0.0,1.6;Select a texture:]'..
+		'field[3.0,1.5;3.0,0.5;tradername;;'..( self.trader_name or '?' )..']'..
+		'button[7.5,0.5;2,0.5;'..npc_id..'_main;Back]'..
+		'button[7.5,1.2;2,0.5;'..npc_id..'_config_store;Store]';
+
+	for i,v in ipairs( mobf_trader.TEXTURES ) do
+		local label = '';
+		if( v==self.trader_texture ) then
+			label = 'current';
+		end
+		formspec = formspec..
+			'image_button['..tostring((i%8)*1.1-1.0)..','..tostring(math.ceil(i/8)*1.1+1.2)..
+					';1.0,1.0;'..v..';'..npc_id..'_config_texture_'..tostring(i)..';'..label..']';
+	end
+
+	minetest.show_formspec( player:get_player_name(), "mob_trading:trader", formspec );
+end
+
+
+
 -----------------------------------------------------------------------------------------------------
 -- formspec input received
 -----------------------------------------------------------------------------------------------------
@@ -225,6 +276,9 @@ mobf_trader.form_input_handler = function( player, formname, fields)
 				end
 				if( v=='Take' ) then
 					mobf_trader.pick_trader_up(       trader, player, menu_path );
+					return true;
+				elseif( v=='Config' or (#menu_path>1 and menu_path[2]=='config')) then
+					mobf_trader.config_trader(        trader, player, menu_path, fields, menu_path );
 					return true;
 				else
 					mob_trading.show_trader_formspec( trader, player, menu_path, fields ); -- this is handled in mob_trading.lua

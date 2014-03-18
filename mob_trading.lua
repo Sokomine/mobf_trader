@@ -258,7 +258,8 @@ mob_trading.show_trader_formspec = function( self, player, menu_path, fields )
 	end
 	-- only the owner can edit the limits
 	if(  self.trader_owner and self.trader_owner == pname and self.trader_typ=='individual') then
-		formspec = formspec..'button_exit[9,1.0;1,0.5;'..npc_id..'_limits;Limits]';
+		formspec = formspec..'button_exit[9,1.5;1,0.5;'..npc_id..'_limits;Limits]'..
+		                     'button_exit[9,1.0;1,0.5;'..npc_id..'_config;Config]';
 	end
 
 	-- find out how many of each item is availabe
@@ -714,15 +715,17 @@ mob_trading.show_trader_formspec_limits = function( self, player, menu_path, fie
 		mob_trading.insert_item_limitation( items, k, 1, v );
 	end
 
-	-- everything that's in one of the offers the trader makes
-	for j,w in ipairs( self.trader_goods ) do -- for all trade offer
-		for i,v in ipairs( w ) do -- for one particular trade offer and all possible payments
-			if( type( v )=='table' ) then 
-				for _,s in ipairs( v ) do -- for all items that are part of a trade
-					mob_trading.insert_item_limitation( items, ItemStack(s):get_name(), 4, true );
+	if( self.trader_goods ) then
+		-- everything that's in one of the offers the trader makes
+		for j,w in ipairs( self.trader_goods ) do -- for all trade offer
+			for i,v in ipairs( w ) do -- for one particular trade offer and all possible payments
+				if( type( v )=='table' ) then 
+					for _,s in ipairs( v ) do -- for all items that are part of a trade
+						mob_trading.insert_item_limitation( items, ItemStack(s):get_name(), 4, true );
+					end
+				else -- only one item is offered
+					mob_trading.insert_item_limitation(         items, ItemStack(v):get_name(), 4, true);
 				end
-			else -- only one item is offered
-				mob_trading.insert_item_limitation(         items, ItemStack(s):get_name(), 4, true);
 			end
 		end
 	end
@@ -829,6 +832,10 @@ mob_trading.show_trader_formspec_limits = function( self, player, menu_path, fie
 			c2..','..t1..','..tostring( v[2] )..','..
 			c3..','..t2..','..tostring( v[3] )..',#AAAAAA,'..k..',';
 	end
+	if( selected > #items ) then
+		selected = 1;
+	end
+
 	formspec = formspec..';'..selected..']';
 
 	-- display the formspec
@@ -1412,6 +1419,4 @@ mob_trading.do_trade = function( self, player, menu_path, trade_details, counted
 	return {msg='You got '..trader_can_trade.price_desc..' for your '..player_can_trade.price_desc..
 			'.\nThank you! Would you like to trade more?', success=true};
 end
-
-
 
