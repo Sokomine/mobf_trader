@@ -46,6 +46,7 @@ minetest.register_privilege("trader_take",  { description = "allows to pick up m
 
 
 dofile(minetest.get_modpath("mobf_trader").."/mob_trading.lua");   -- the actual trading code - complete with formspecs
+--TODO dofile(minetest.get_modpath("mobf_trader").."/mob_sitting.lua");   -- allows the mob to sit/lie on furniture
 
 mobf_trader.log = function( msg, self )
 	if( self==nil ) then
@@ -210,6 +211,9 @@ mobf_trader.config_trader = function( self, player, menu_path, fields, menu_path
 			self.trader_texture = mobf_trader.TEXTURES[ nr ];
 			self.object:set_properties( { textures = { self.trader_texture }});
 		end
+	elseif( menu_path and #menu_path>3 and menu_path[2]=='config' and menu_path[3]=='anim' ) then
+		self.trader_animation = menu_path[4];
+		self.object:set_animation({x=self.animation[ self.trader_animation..'_START'], y=self.animation[ self.trader_animation..'_END']}, self.animation_speed);
 	end
 
 	local formspec = 'size[10,8]'; 
@@ -226,6 +230,13 @@ mobf_trader.config_trader = function( self, player, menu_path, fields, menu_path
 	local npc_id = self.trader_id;
 	formspec = formspec..
 		'label[3.0,0.0;Configure your trader]'..
+		'label[0.0,0.5;Activity:]'..
+		'button[1.5,0.6;1,0.5;'..npc_id..'_config_anim_stand;*stand*]'..
+		'button[2.5,0.6;1,0.5;'..npc_id..'_config_anim_sit;*sit*]'..
+		'button[3.5,0.6;1,0.5;'..npc_id..'_config_anim_sleep;*sleep*]'..
+		'button[4.5,0.6;1,0.5;'..npc_id..'_config_anim_walk;*walk*]'..
+		'button[5.5,0.6;1,0.5;'..npc_id..'_config_anim_mine;*mine*]'..
+		'button[6.5,0.6;1,0.5;'..npc_id..'_config_anim_walkmine;*w&m*]'..
 		'label[0.0,1.0;Name of the trader:]'..
 		'label[0.0,1.6;Select a texture:]'..
 		'field[3.0,1.5;3.0,0.5;tradername;;'..( self.trader_name or '?' )..']'..
@@ -274,8 +285,10 @@ mobf_trader.form_input_handler = function( player, formname, fields)
 				if( #menu_path == 1 ) then
 					menu_path = nil;
 				end
-				if( v=='Take' ) then
-					mobf_trader.pick_trader_up(       trader, player, menu_path );
+				if( v=='Take' ) then --and fields['quit']) then
+					if( not(fields.quit )) then
+						mobf_trader.pick_trader_up(       trader, player, menu_path );
+					end
 					return true;
 				elseif( v=='Config' or (#menu_path>1 and menu_path[2]=='config')) then
 					mobf_trader.config_trader(        trader, player, menu_path, fields, menu_path );
@@ -358,7 +371,7 @@ mobf_trader.trader_entity_prototype = {
 
 	-- so far, this is more or less the redefinition of the standard player model
 	physical     = true,
-	collisionbox = {-0.35,-1.0,-0.35, 0.35,0.8,0.35},
+	collisionbox = {-0.30,-1.0,-0.30, 0.30,0.8,0.30},
 
 	visual       = "mesh";
 	visual_size  = {x=1, y=1, z=1},
@@ -372,18 +385,16 @@ mobf_trader.trader_entity_prototype = {
         animation = {
                 stand_START     =   0,
                 stand_END       =  79,
---[[
                 sit_START       =  81,
                 sit_END         = 160,
-                lay_START       = 162,
-                lay_END         = 166,
+                sleep_START     = 162,
+                sleep_END       = 166,
                 walk_START      = 168,
                 walk_END        = 187,
                 mine_START      = 189,
                 mine_END        = 198,
-                walk_mine_START = 200,
-                walk_mine_END   = 219,
---]]
+                walkmine_START  = 200,
+                walkmine_END    = 219,
         },
         animation_speed = 30,
 
@@ -428,6 +439,7 @@ mobf_trader.trader_entity_prototype = {
 				trader_texture   = self.trader_texture,
 				trader_goods     = self.trader_goods,
 				trader_limit     = self.trader_limit,
+				trader_animation = self.trader_animation,
 			});
 	end,
 
@@ -451,7 +463,11 @@ mobf_trader.trader_entity_prototype = {
 				self.trader_id        = data.trader_id;
 				self.trader_texture   = data.trader_texture;
 				self.trader_goods     = data.trader_goods;
-				self.trader_limit     = data.trader_limit;
+				self.trader_animation = data.trader_animation;
+			end
+
+			if( not( self.trader_animation )) then
+				self.trader_animation = 'stand';
 			end
 	
 			if( self.trader_texture ) then
@@ -460,7 +476,7 @@ mobf_trader.trader_entity_prototype = {
 		end
 						
 		-- the mob will do nothing but stand around
-		self.object:set_animation({x=self.animation.stand_START, y=self.animation.stand_END}, self.animation_speed);
+		self.object:set_animation({x=self.animation[ self.trader_animation..'_START'], y=self.animation[ self.trader_animation..'_END']}, self.animation_speed);
 
 		-- initialize a new trader
 		if( not( self.trader_name ) or self.trader_name=='' or self.trader_id=='') then
@@ -592,6 +608,7 @@ minetest.register_craftitem("mobf_trader:trader_item", {
 		self.trader_texture   = data.trader_texture;
 		self.trader_goods     = data.trader_goods;
 		self.trader_limit     = data.trader_limit;
+		self.trader_animation = 'stand';
 		self.object:set_properties( { textures = { data.trader_texture }});
 
 		-- the trader was placed at a new location
@@ -600,6 +617,13 @@ minetest.register_craftitem("mobf_trader:trader_item", {
 		minetest.chat_send_player( placer:get_player_name(),'Trader placed.');
 
 		mobf_trader.log( placer:get_player_name()..' placed', self );
+
+--		if( mob_sitting.allow_sit( self, nil )) then
+--			mob_sitting.set_animation( self, 'sit' );
+--			-- TODO: changing the collusion box afterwards leads to the mob sinking into the ground
+--			-- self.object:set_properties( { collisionbox = { {-0.30,0.0,-0.30, 0.30,1.5,0.30} }});
+--		end
+
 		return '';
 	end,
 })
