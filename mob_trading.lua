@@ -1231,12 +1231,17 @@ mob_trading.move_trade_goods = function( source_inv, target_inv, stack, player, 
 			if( not( leftover:is_empty())
 			    and (leftover:get_count() >= remaining_stack:get_count())) then
 
+				-- find a place between player and trader so that the player can see the items falling down; slightly elevated
+				local p1 = player:getpos();
+				local p2 = self.object:getpos();
+				local p3 = {x=p1.x-((p1.x-p2.x)/2), y=p1.y-((p1.y-p2.y)/2)+1.0, z=p1.z-((p1.z-p2.z)/2)};
+
 				-- tell the player to take a look
 				minetest.chat_send_player( player:get_player_name(), self.trader_name..': '..
 					'You do not have enough free space in your inventory. '..
 					'Therefore, '..leftover:get_count()..'x '..leftover:get_name()..' have been dropped at where you stand.');
 				-- place the item stack at the position where the player is standing
-				minetest.add_item( player:getpos(), remaining_stack );
+				minetest.add_item( p3, remaining_stack );
 				-- the stack was dropped completely
 				leftover:set_count(0);
 				if( not( leftover:is_empty())) then
