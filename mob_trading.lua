@@ -241,7 +241,7 @@ mob_trading.show_trader_formspec = function( self, player, menu_path, fields )
 	end
 
 	if( menu_path and menu_path[1] ) then
-	      formspec = formspec..'button[4.5,6.3;2,0.5;'..menu_path[1]..';Show goods]';
+	      formspec = formspec..'button[4.5,6.3;2,0.5;'..npc_id..'_main;Show goods]';
 	end
 
 	formspec = formspec..'label[0.5,'..(0.5+m_up)..';'..minetest.formspec_escape( greeting1 )..']'..
