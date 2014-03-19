@@ -537,7 +537,6 @@ mob_trading.show_trader_formspec_item_list = function( offset_x, offset_y, stack
 				a = 0;
 			end
 		end
--- TODO: it is possible that a trade may be impossible due to not enough free inv slots to ensure successful transfer of all stacks
 		if( stretch_x > 0.7 and is_offer and anz_avail>0) then
 			formspec = formspec..'label[9.0,'..(offset_y+0.75)..';Left: '..tostring(anz_avail)..']';
 		end
@@ -1011,6 +1010,7 @@ mob_trading.can_trade = function( price_stack_str, debtor_name, debtor_inv, rece
 		local price_desc   = '';
 		local price_stacks = {};
 		local price_types  = {};
+		local free_slots_wanted = #price_stack_str; -- for each price stack, we need a free inventory slot
 		for k,v in pairs( items ) do
 			-- recursively check if payment is possible
 			local res = mob_trading.can_trade( k..' '..tostring( v ), debtor_name, debtor_inv, receiver_name, receiver_inv, player_is_debtor, counted_inv, self );
@@ -1024,12 +1024,21 @@ mob_trading.can_trade = function( price_stack_str, debtor_name, debtor_inv, rece
 			-- description of first item 
 			if(     price_desc == '' ) then
 				price_desc = res.price_desc;
-			-- cheat: this isthe last price description
+			-- cheat: this is the last price description
 			elseif( #price_stacks == anz_diffrent_items ) then
 				price_desc = price_desc..' and '..res.price_desc;
 			else
 				price_desc = price_desc..', '..res.price_desc;
 			end
+			-- if money/money2 is part of the price, then that will not need a free inventory slot in the trader's chest
+			if( res.price_types and res.price_types[1] ~= 'direct' ) then
+				free_slots_wanted = free_slots_wanted - 1;
+			end
+		end
+		-- with several items as payment, we want a free slot for each payment - else we cannot be sure that the trader can store all of the payment
+		if( free_slots_wanted > 0 and (not(counted_inv[""]) or counted_inv[""]<free_slots_wanted )) then
+			return { error_msg = 'Sorry, I do not have enough free inventory slots to ensure that the trade can take place.',
+				 price_desc = price_desc, price_stacks = price_stacks, price_types = price_types };
 		end
 		-- if all parts can be paid, the whole payment will be possible
 		return { error_msg = nil, price_desc = price_desc, price_stacks = price_stacks, price_types = price_types };
@@ -1211,7 +1220,14 @@ mob_trading.move_trade_goods = function( source_inv, target_inv, stack, player, 
 			end
 			local removed = source_inv:remove_item( "main", stack );
 			if( not(removed) or removed:get_count() < 1 ) then
--- TODO: what to do with the partly removed items?
+				-- this error is not supposed to happen - we DID check if everything could get removed; if this error occourse nonetheless,
+				-- it requires further invesitation
+				minetest.chat_send_player( player:get_player_name(),'Error: Could not transfer all the promised items. Failed to remove '..
+					tostring( stack:get_name() )..' '..tostring( stack:get_count() )..'. Please contact an admin!');
+				print( '[mob_trading] ERROR: Could not transfer all items; player: '..tostring( player:get_player_name() )..
+					', trading with '..tostring( self.trader_name or '?' )..'; '..tostring( stack:get_name() )..
+					' '..tostring( stack:get_count()..'.'));
+
 				return false;
 			end
 			anz = anz - removed:get_count();
