@@ -600,6 +600,14 @@ mob_trading.store_trade_offer_changes = function( self, pname,  menu_path, field
 				if( not( minetest.registered_items[ help[1] ] ) and help[1]~=mob_trading.MONEY_ITEM and help[1]~=mob_trading.MONEY2_ITEM) then
 					return 'Error: \''..tostring( help[1] )..'\' is not a valid item. Please check your spelling.';
 				end
+				-- do not allow stacks that are larger than max stack size (this is not relevant for money)
+				if( minetest.registered_items[ help[1] ] ) then
+					local stack = ItemStack( text );
+					if( stack:get_count() > stack:get_stack_max() ) then
+						return 'Error: \''..tostring( help[1] )..'\' can only be traded in stacks of up to '..
+							tostring( stack:get_stack_max() )..' pieces at a time.';
+					end
+				end
 				table.insert( offer_one_side, text );
 			end
 		end
