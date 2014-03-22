@@ -257,9 +257,12 @@ mob_trading.show_trader_formspec = function( self, player, menu_path, fields )
 		formspec = formspec..'button_exit[9,0.5;1,0.5;'..npc_id..'_take;Take]';
 	end
 	-- only the owner can edit the limits
-	if(  self.trader_owner and self.trader_owner == pname and self.trader_typ=='individual') then
-		formspec = formspec..'button_exit[9,1.5;1,0.5;'..npc_id..'_limits;Limits]'..
-		                     'button_exit[9,1.0;1,0.5;'..npc_id..'_config;Config]';
+	if(  self.trader_owner and self.trader_owner == pname ) then
+		if( self.trader_typ=='individual') then
+			formspec = formspec..'button_exit[9,1.5;1,0.5;'..npc_id..'_limits;Limits]';
+		end
+		-- admin traders can now be configured as well
+		formspec = formspec..'button_exit[9,1.0;1,0.5;'..npc_id..'_config;Config]';
 	end
 
 	-- find out how many of each item is availabe
@@ -1445,6 +1448,6 @@ mob_trading.do_trade = function( self, player, menu_path, trade_details, counted
 
 
 	return {msg='You got '..trader_can_trade.price_desc..' for your '..player_can_trade.price_desc..
-			'.\nThank you! Would you like to trade more?', success=true};
+			'. Thank you! Would you like to trade more?', success=true};
 end
 
