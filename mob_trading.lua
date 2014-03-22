@@ -1436,7 +1436,7 @@ mob_trading.do_trade = function( self, player, menu_path, trade_details, counted
 				' gets '..minetest.serialize(   trade_details[ 1 ])..
 				' for ' ..minetest.serialize(   trade_details[ choice2 ])..
 				' from '..tostring(             self.trader_id )..
-				' at '..minetest.pos_to_string( self.trader_pos )..
+				' at '..minetest.pos_to_string( self.object:getpos() )..
 				' (owned by '..tostring(        self.trader_owner )..')'..
 				' typ:'..tostring(              self.trader_typ or '?' )..'.');
 
