@@ -169,7 +169,7 @@ mobf_trader.pick_trader_up     = function( self, player, menu_path )
 	-- no point in doing more if the player can't take the trader due to too few space
 	if( not( player_inv:room_for_item("main", 'mobf_trader:trader_item' ))) then
 		minetest.chat_send_player( player:get_player_name(),
-			'You do not have a free inventory space for the trader. Taking failed.');
+			'You do not have a free inventory slot for the trader. Taking failed.');
 		return;
 	end
 
@@ -321,6 +321,16 @@ end
 
 
 -----------------------------------------------------------------------------------------------------
+-- turn towards the player
+-----------------------------------------------------------------------------------------------------
+mobf_trader.turn_towards_player = function( self, player )
+	if( self.object and self.object.setyaw ) then
+		self.object:setyaw( mobf_trader.get_face_direction( self.object:getpos(), player:getpos() ));
+	end
+end
+
+
+-----------------------------------------------------------------------------------------------------
 -- formspec input received
 -----------------------------------------------------------------------------------------------------
 mobf_trader.form_input_handler = function( player, formname, fields)
@@ -353,10 +363,13 @@ mobf_trader.form_input_handler = function( player, formname, fields)
 					end
 					return true;
 				elseif( v=='Config' or (#menu_path>1 and menu_path[2]=='config')) then
+					mobf_trader.turn_towards_player(  trader, player );
 					mobf_trader.config_trader(        trader, player, menu_path, fields, menu_path );
 					return true;
 				else
-					mob_trading.show_trader_formspec( trader, player, menu_path, fields ); -- this is handled in mob_trading.lua
+					mobf_trader.turn_towards_player(  trader, player );
+					mob_trading.show_trader_formspec( trader, player, menu_path, fields,
+									  mobf_trader.npc_trader_data[ trader.trader_typ ].goods ); -- this is handled in mob_trading.lua
 					return true;
 				end
 				return true;
@@ -588,10 +601,13 @@ mobf_trader.trader_entity_prototype = {
 		self.object:set_hp( self.hp_max );
 		-- talk to the player
 		if( puncher and puncher:get_player_name() ) then
+			mobf_trader.turn_towards_player(  self, puncher );
 			minetest.chat_send_player( puncher:get_player_name(),
+				( self.trader_name or 'A trader' )..': '..
 				'Hey! Stop doing that. I am a peaceful trader. Here, buy something:');
 			-- marketing - if *that* doesn't disencourage aggressive players... :-)
-			mob_trading.show_trader_formspec( self, puncher, nil, nil ); -- this is handled in mob_trading.lua
+			mob_trading.show_trader_formspec( self, puncher, nil, nil,
+							  mobf_trader.npc_trader_data[ self.trader_typ ].goods ); -- this is handled in mob_trading.lua
 		end
 	end,
 
@@ -603,7 +619,9 @@ mobf_trader.trader_entity_prototype = {
 			return;
 		end
 
-		mob_trading.show_trader_formspec( self, clicker, nil, nil ); -- this is handled in mob_trading.lua
+		mobf_trader.turn_towards_player(  self, clicker );
+		mob_trading.show_trader_formspec( self, clicker, nil, nil,
+						  mobf_trader.npc_trader_data[ self.trader_typ ].goods ); -- this is handled in mob_trading.lua
 	end,
 }
 

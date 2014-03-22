@@ -3,9 +3,6 @@
 --  The only relevant function for other mods to call here is:
 --      mob_trading.show_trader_formspec( self, player, menu_path, fields )
 --  All other functions are more or less internal.
---  Calls the following functions in the mobf_trader namespace:
---      mobf_trader.get_face_direction(..)    
---      mobf_trader.log(..)
 ----------------------------------------------------------------------------
 
 
@@ -42,15 +39,15 @@ mob_trading.tmp_lists = {};
 -- self HAS to contain:
 --      self.trader_id        unique id of the trader (unique for the entire map)
 --      self.trader_name      i.e. 'Fritz'; used only for the greeting
---      self.object           trader mobs will turn toward the player; traders of the type individual need to find locked chests in their environment
---      self.trader_typ       needs to be an index of mobf_trader.npc_trader_data; required in order find out what the trader deals with (trader_goodsa)
+--      self.object           traders of the type individual need to find locked chests in their environment
+--      self.trader_typ       traders with the type 'individual' are handled specially (they trade for players);
 --      self.trader_goods     required for traders of the typ individual; else determined through self.trader_typ
 --      self.trader_owner     required for traders of the typ individual
 --      self.trader_sold      used for collecting statistics
 -- Optional:
 --      self.trader_inv       helper variable that will contain a reference to the trader chest's inventory; will be set automaticly
 --      self.trader_limit     will be used if set; may contain self.trader_limit.sell_if_more[ item name ] and self.trader_limit.buy_if_less[ item name ]
-mob_trading.show_trader_formspec = function( self, player, menu_path, fields )
+mob_trading.show_trader_formspec = function( self, player, menu_path, fields, trader_goods )
 
 	if( not( self ) or not( player )) then
 		return;
@@ -63,18 +60,12 @@ mob_trading.show_trader_formspec = function( self, player, menu_path, fields )
 		return;
 	end
 
-	-- turn towards the customer
-	if( self.object and self.object.setyaw ) then
-		self.object:setyaw( mobf_trader.get_face_direction( self.object:getpos(), player:getpos() ));
-	end
-
 	-- which goods does this trader trade?
-	local trader_goods = mobf_trader.npc_trader_data[ self.trader_typ ].goods;
 	if( self.trader_typ == 'individual' or not( trader_goods ) or #trader_goods < 1 ) then
 		trader_goods = self.trader_goods;
-		if( not( trader_goods )) then
-			trader_goods = {};
-		end
+	end
+	if( not( trader_goods )) then
+		trader_goods = {};
 	end
 
 	local formspec = 'size[10,11]'..
@@ -1440,11 +1431,14 @@ mob_trading.do_trade = function( self, player, menu_path, trade_details, counted
 	end
 
 	-- log the action
-	mobf_trader.log( player:get_player_name()..
-		' gets '..minetest.serialize( trade_details[ 1 ])..
-		' for ' ..minetest.serialize( trade_details[ choice2 ])..
-		' from '..tostring( self.trader_id )..
-		' (owned by '..tostring( self.trader_owner )..')');
+	minetest.log("action", '[mob_trading] '..
+				player:get_player_name()..
+				' gets '..minetest.serialize(   trade_details[ 1 ])..
+				' for ' ..minetest.serialize(   trade_details[ choice2 ])..
+				' from '..tostring(             self.trader_id )..
+				' at '..minetest.pos_to_string( self.trader_pos )..
+				' (owned by '..tostring(        self.trader_owner )..')'..
+				' typ:'..tostring(              self.trader_typ or '?' )..'.');
 
 
 	return {msg='You got '..trader_can_trade.price_desc..' for your '..player_can_trade.price_desc..
