@@ -198,6 +198,42 @@ end
 
 
 
+-- create pseudoradom gaussian distributed numbers
+mobf_trader.random_number_generator_polar = function()
+	local u = 0;
+	local v = 0;
+	repeat
+		u = 2 * math.random() - 1;
+		v = 2 * math.random() - 1;
+		q = u * u + v * v
+	until( (0 < q) and (q < 1));
+
+	p = math.sqrt(-2 * math.log(q) / q) -- math.log returns ln(q)
+	return {x1 = u * p, x2 = v * p };
+end
+
+
+mobf_trader.set_random_visual_size = function( self )
+	local res = mobf_trader.random_number_generator_polar();
+	local width  = 1.0+(res.x1/20.0);
+	local height = 1.0+(res.x2/10.0);
+	width  = math.floor( width  * 100 + 0.5 );
+	height = math.floor( height * 100 + 0.5 );
+	mobf_trader.update_visual_size( self, {x=(width/100.0), y=(height/100.0), z=(width/100.0)});
+end
+
+mobf_trader.update_visual_size = function( self, new_size )
+	if( not( new_size ) or not( new_size.x )) then
+		new_size = {x=1, y=1, z=1};
+	end
+	if( not( self.trader_vsize ) or not(self.trader_vsize.x)) then
+		self.trader_vsize = {x=1, y=1, z=1};
+	end
+	self.trader_vsize.x = new_size.x;
+	self.trader_vsize.y = new_size.y;
+	self.trader_vsize.z = new_size.z;
+	self.object:set_properties( { visual_size  = {x=self.trader_vsize.x, y=self.trader_vsize.y, z=self.trader_vsize.z}});
+end
 
 -----------------------------------------------------------------------------------------------------
 -- set name and texture of a trader
@@ -213,10 +249,13 @@ mobf_trader.config_trader = function( self, player, menu_path, fields, menu_path
 		end
 	elseif( menu_path and #menu_path>3 and menu_path[2]=='config' and menu_path[3]=='anim' ) then
 		self.trader_animation = menu_path[4];
-		self.object:set_animation({x=self.animation[ self.trader_animation..'_START'], y=self.animation[ self.trader_animation..'_END']}, self.animation_speed);
+		self.object:set_animation({x=self.animation[ self.trader_animation..'_START'], y=self.animation[ self.trader_animation..'_END']},
+				self.animation_speed-5+math.random(10));
 	end
 
 	local formspec = 'size[10,8]'; 
+	fields['traderheight'] = tonumber( fields['traderheight']);
+	fields['traderwidth']  = tonumber( fields['traderwidth']);
 
 	-- rename a trader
 	if( fields['tradername'] and fields['tradername'] ~= "" and fields['tradername'] ~= self.trader_name ) then
@@ -225,6 +264,22 @@ mobf_trader.config_trader = function( self, player, menu_path, fields, menu_path
 			fields['tradername']..'\".');
 		self.trader_name = fields['tradername'];
 		formspec = formspec..'label[3.0,1.5;Renamed successfully.]';
+
+	-- height has to be at least halfway reasonable
+	elseif( fields['traderheight'] and fields['traderheight']>20 and fields['traderheight']<300 
+		and (fields['traderheight']/180.0)~=self.trader_vsize.y ) then
+
+		local new_height = math.floor((fields['traderheight']/1.8) +0.5)/100.0;
+		mobf_trader.update_visual_size( self, {x=self.trader_vsize.x, y=new_height, z=self.trader_vsize.z} );
+		formspec = formspec..'label[3.0,1.5;Height changed to '..tostring( self.trader_vsize.y*180)..' cm.]';
+
+	-- height has to be at least halfway reasonable
+	elseif( fields['traderwidth'] and fields['traderwidth']>50 and fields['traderwidth']<150 
+		and (fields['traderwidth']/100.0)~=self.trader_vsize.x ) then
+
+		local new_width  = math.floor(fields['traderwidth'] +0.5)/100.0;
+		mobf_trader.update_visual_size( self, {x=new_width, y=self.trader_vsize.y, z=new_width} );
+		formspec = formspec..'label[3.0,1.5;Width changed to '..tostring( self.trader_vsize.x*100)..'%.]';
 	end
 
 	local npc_id = self.trader_id;
@@ -238,9 +293,16 @@ mobf_trader.config_trader = function( self, player, menu_path, fields, menu_path
 		'button[5.5,0.6;1,0.5;'..npc_id..'_config_anim_mine;*mine*]'..
 		'button[6.5,0.6;1,0.5;'..npc_id..'_config_anim_walkmine;*w&m*]'..
 		'label[0.0,1.0;Name of the trader:]'..
-		'label[0.0,1.6;Select a texture:]'..
 		'field[3.0,1.5;3.0,0.5;tradername;;'..( self.trader_name or '?' )..']'..
-		'button[7.5,0.5;2,0.5;'..npc_id..'_main;Back]'..
+		'label[5.8,1.0;Height:]'..
+		'field[6.8,1.5;0.9,0.5;traderheight;;'..( self.trader_vsize.y*180)..']'..
+		'label[7.2,1.0;cm]'..
+		'label[5.8,1.5;Width:]'..
+		'field[6.8,2.0;0.9,0.5;traderwidth;;'..( (self.trader_vsize.x*100) or '100' )..']'..
+		'label[7.2,1.5;%]'..
+		'label[0.0,1.6;Select a texture:]'..
+		'button[7.5,0.2;2,0.5;'..npc_id..'_take;Take]'..
+		'button[7.5,0.7;2,0.5;'..npc_id..'_main;Back]'..
 		'button[7.5,1.2;2,0.5;'..npc_id..'_config_store;Store]';
 
 	for i,v in ipairs( mobf_trader.TEXTURES ) do
@@ -339,6 +401,8 @@ mobf_trader.initialize_trader = function( self, trader_name, trader_typ, trader_
 	self.trader_pos       = self.object:getpos(); -- the place where the trader was "born"
 	self.trader_birthtime = os.time();       -- when was the npc first called into existence?
 	self.trader_sold      = {};              -- the trader is new and had no time to sell anything yet
+
+	mobf_trader.set_random_visual_size( self );
 
 	-- create unique ID for this trader; floor is used to make the ID shorter (two mobs at the
 	-- same place would be confusing anyway)
@@ -440,6 +504,7 @@ mobf_trader.trader_entity_prototype = {
 				trader_goods     = self.trader_goods,
 				trader_limit     = self.trader_limit,
 				trader_animation = self.trader_animation,
+				trader_vsize     = self.trader_vsize,
 			});
 	end,
 
@@ -464,6 +529,7 @@ mobf_trader.trader_entity_prototype = {
 				self.trader_texture   = data.trader_texture;
 				self.trader_goods     = data.trader_goods;
 				self.trader_animation = data.trader_animation;
+				self.trader_vsize     = data.trader_vsize;
 			end
 
 			if( not( self.trader_animation )) then
@@ -473,10 +539,15 @@ mobf_trader.trader_entity_prototype = {
 			if( self.trader_texture ) then
 				self.object:set_properties( { textures = { self.trader_texture }});
 			end
+
+			if( self.trader_vsize ) then
+				mobf_trader.update_visual_size( self, self.trader_vsize );
+			end
 		end
 						
 		-- the mob will do nothing but stand around
-		self.object:set_animation({x=self.animation[ self.trader_animation..'_START'], y=self.animation[ self.trader_animation..'_END']}, self.animation_speed);
+		self.object:set_animation({x=self.animation[ self.trader_animation..'_START'], y=self.animation[ self.trader_animation..'_END']},
+				self.animation_speed-5+math.random(10));
 
 		-- initialize a new trader
 		if( not( self.trader_name ) or self.trader_name=='' or self.trader_id=='') then
@@ -610,6 +681,9 @@ minetest.register_craftitem("mobf_trader:trader_item", {
 		self.trader_limit     = data.trader_limit;
 		self.trader_animation = 'stand';
 		self.object:set_properties( { textures = { data.trader_texture }});
+		if( data.trader_vsize ) then
+			mobf_trader.update_visual_size( self, data.trader_vsize );
+		end
 
 		-- the trader was placed at a new location
 		self.trader_pos       = pos;
