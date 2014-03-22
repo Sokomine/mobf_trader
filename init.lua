@@ -33,7 +33,7 @@ mobf_trader = {}
 mobf_trader.npc_trader_data = {}
 
 
-mobf_trader.TEXTURES = {'kuhhaendler.png', 'bauer_in_sonntagskleidung.png', 'baeuerin.png' };
+mobf_trader.TEXTURES = {'kuhhaendler.png', 'bauer_in_sonntagskleidung.png', 'baeuerin.png', 'character.png', 'wheat_farmer_by_addi.png' };
 -- further good looking skins:
 --mobf_trader.TEXTURES = {'kuhhaendler.png', 'bauer_in_sonntagskleidung.png', 'baeuerin.png',
 --			"pawel04z.png", "character.png", "skin_2014012302322877138.png",
@@ -257,6 +257,9 @@ mobf_trader.config_trader = function( self, player, menu_path, fields, menu_path
 	fields['traderheight'] = tonumber( fields['traderheight']);
 	fields['traderwidth']  = tonumber( fields['traderwidth']);
 
+	if( not( self.trader_vsize ) or not( self.trader_vsize.x )) then
+		self.trader_vsize = {x=1,y=1,z=1};
+	end
 	-- rename a trader
 	if( fields['tradername'] and fields['tradername'] ~= "" and fields['tradername'] ~= self.trader_name ) then
 		minetest.chat_send_player( player:get_player_name(),
