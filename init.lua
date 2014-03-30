@@ -324,23 +324,13 @@ mob_pickup.register_mob_for_pickup( 'mobf_trader:trader', 'mobf_trader:trader_it
 
 
 
--- import all the traders; if you do not want any of them, comment out the line representing the unwanted traders (they are only created if their mods exist)
+-- import all the traders; if you do not want any of them, comment out the line representing the unwanted traders (they are only created if their mods exists)
 
 dofile(minetest.get_modpath("mobf_trader").."/trader_misc.lua");      -- trades a mixed assortment
 dofile(minetest.get_modpath("mobf_trader").."/trader_clay.lua");      -- no more destroying beaches while digging for clay and sand!
 dofile(minetest.get_modpath("mobf_trader").."/trader_moretrees.lua"); -- get wood from moretrees without chopping down trees
 dofile(minetest.get_modpath("mobf_trader").."/trader_animals.lua");   -- buy animals - no need to catch them with a lasso
-dofile(minetest.get_modpath("mobf_trader").."/trader_farming.lua");   -- they sell seeds and fruits - good against hunger!
+dofile(minetest.get_modpath("mobf_trader").."/trader_farming.lua");   -- they sell seeds and fruits - good against hunger! also contains special seeds trader
+dofile(minetest.get_modpath("mobf_trader").."/trader_flowers.lua");   -- flowers and other plants from default (cactus, papyrus, ..)
+dofile(minetest.get_modpath("mobf_trader").."/trader_ores.lua");      -- sells ores for tree/wood and food (both needed for further mining)
 
-
--- TODO: default:cactus  default:papyrus and other plants
-
--- TODO: accept food in general as trade item (accept groups?)
-
--- TODO: trader foer angeln?
--- TODO: trader fuer moreores (ingots)
--- TODO: bergbau-trader; verkauft eisen und kohle, kauft brot/food/apples
--- TODO: trader fuer homedecor
--- TODO: trader fuer 3dforniture
-
--- TODO: special trader for seeds

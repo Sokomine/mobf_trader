@@ -4,6 +4,8 @@
 -- adds traders for wheat, cotton and pumpkin (with farming);
 -- additionally trader for carrot, orange, potatoe, rhubarb, strawberry, tomatoe, banana, cacoa, rubber (with farming_plus)
 
+local seeds = {}; -- there will be a special trader for seeds
+
 if( minetest.get_modpath("farming") ~= nil ) then
 
    for i,v in ipairs( {'wheat','cotton','pumpkin'}) do
@@ -12,6 +14,8 @@ if( minetest.get_modpath("farming") ~= nil ) then
        {"farming:"..v.."_seed 1",        "farming:scarecrow",      "farming:scarecrow_light 1"},
        {"farming:hoe_wood 1",            "default:wood 10",        "default:cobble 10"},
       };
+
+      table.insert( seeds, {"farming:"..v.."_seed 2", "default:dirt 20", "default:bucket_water", "default:steel_ingot 4", "default:leaves 99" });
 
       if(     v=='wheat') then
          table.insert( goods, {"farming:bread 1",               "default:coal_lump 9",    "default:apple 2"});
@@ -50,6 +54,8 @@ if( minetest.get_modpath("farming_plus") ~= nil ) then
    -- add traders for the diffrent versions of wood
    for i,v in ipairs( {'carrot', 'orange', 'potatoe', 'rhubarb', 'strawberry', 'tomato' }) do
    
+      table.insert( seeds, {"farming_plus:"..v.."_seed 2", "default:dirt 20", "default:bucket_water", "default:steel_ingot 4", "default:leaves 99" });
+
       local goods = {
        {"farming_plus:"..v.."_item 1",   "default:coal_lump 3",    "default:wood 8"},
        {"farming_plus:"..v.."_item 10",  "default:steel_ingot 2",  "default:chest_locked 1"},
@@ -68,6 +74,8 @@ if( minetest.get_modpath("farming_plus") ~= nil ) then
 
    for i,v in ipairs( {'banana','cocoa','rubber'} ) do 
        
+      table.insert( seeds, {"farming_plus:"..v.."_sapling", "default:dirt 40", "default:steel_ingot 16", "default:gold_ingot 2" });
+
       local goods = {
        {"farming_plus:"..v.."_sapling 1", "default:mese_crystal 3", "bucket:bucket_water 1"},
        {"farming_plus:"..v.."_leaves 10", "default:coal_lump 1",    "default:wood 4"},
@@ -120,3 +128,12 @@ if( minetest.get_modpath("farming_plus") ~= nil ) then
 
 end
 
+if( seeds and #seeds > 0 ) then
+	mobf_trader.add_trader( mobf_trader.npc_trader_prototype,
+		"trader specialized in seeds",
+		"seeds",
+		seeds,
+		{ "Sebastian" },
+		""
+	);
+   end
