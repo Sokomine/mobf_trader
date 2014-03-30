@@ -5,6 +5,8 @@
 --  All other functions are more or less internal.
 ----------------------------------------------------------------------------
 
+-- TODO: limit offer to x items/hour?
+-- TODO: accept group:bla for prices as well? could be very practical (but would also be a lot of work)
 
 -- contains mostly defines and functions
 mob_trading = {};
@@ -750,7 +752,8 @@ mob_trading.show_trader_formspec_limits = function( self, player, menu_path, fie
 		end
 
 		if( (selection['type'] == 'DCL' or selection['type'] == 'CHG')
-		   and mob_trading.tmp_lists[ pname ] and #mob_trading.tmp_lists[ pname ] >= selected ) then
+		   and mob_trading.tmp_lists[ pname ] and #mob_trading.tmp_lists[ pname ] >= selected 
+		   and mob_trading.tmp_lists[ pname ][ selected ] ~= "" ) then
 
 			local selected_item = mob_trading.tmp_lists[ pname ][ selected ];
 
