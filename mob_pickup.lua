@@ -4,7 +4,6 @@
 -----------------------------------------------------------------------------------------------------
 -- uses mob_basics.find_mob_by_id and mob_basics.update_visual_size when available
 
--- TODO: save mob data to a file
 -- TODO: add after_place, after_pickup?
 
 -- the privilege allows admins/moderators to pick up and remove mobs which are undesired for whatever reason
@@ -170,6 +169,8 @@ mob_pickup.pick_mob_up = function( self, player, menu_path, prefix, is_personali
 	player_inv:add_item( "main", mob_as_item );
 	-- remove the now obsolete mob
 	self.object:remove();
+	-- remove the mob from the stored list
+	mob_basics.forget_mob( staticdata_table[ prefix..'_id'  ] );
 end
 
 
@@ -267,5 +268,6 @@ mob_pickup.place_mob = function( itemstack, placer, pointed_thing, prefix, entit
 
 	mob_pickup.log( pname..' placed', self, prefix ); 
 
+	mob_basics.update( self, prefix ); -- store data about this placed mob
 	return '';
 end

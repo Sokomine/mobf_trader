@@ -7,9 +7,9 @@
 -- * adds spawn command
 -- * initializes a mob
 -- * helper functions (i.e. turn towards player)
+-- * data of *active* traders (those that stand around somewhere in the world; excluding those in 
+--   inventories in players or chests) is stored
 ------------------------------------------------------------------------------------------------------
-
--- TODO: save trader data to a file
 
 minetest.register_privilege("mob_basics_spawn", { description = "allows to spawn mob_basic based mobs with a chat command (i.e. /trader)", give_to_singleplayer = false});
 
@@ -29,6 +29,8 @@ mob_basics.TEXTURES = {'kuhhaendler.png', 'bauer_in_sonntagskleidung.png', 'baeu
 -- TODO: gather textures from installed skin mods?
 
 
+-- keep a list of all mobs that are handled by this mod
+mob_basics.known_mobs = {}
 
 
 
@@ -49,6 +51,80 @@ mob_basics.log = function( msg, self, prefix )
 end
 
 
+-----------------------------------------------------------------------------------------------------
+-- Save mob data to a file
+-----------------------------------------------------------------------------------------------------
+-- TODO: save and restore ought to be library functions and not implemented in each individual mod!
+mob_basics.save_data = function()
+
+	local data = minetest.serialize( mob_basics.known_mobs );
+	local path = minetest.get_worldpath().."/mod_mob_basics.data";
+
+	local file = io.open( path, "w" );
+	if( file ) then
+		file:write( data );
+		file:close();
+	else
+		print("[Mod mob_basics] Error: Savefile '"..tostring( path ).."' could not be written.");
+	end
+end
+
+
+-----------------------------------------------------------------------------------------------------
+-- restore data
+-- Note: At first start, there will be a complaint about missing savefile. That message can be ignored.
+-----------------------------------------------------------------------------------------------------
+mob_basics.restore_data = function()
+
+	local path = minetest.get_worldpath().."/mod_mob_basics.data";
+
+	local file = io.open( path, "r" );
+	if( file ) then
+		local data = file:read("*all");
+		mob_basics.known_mobs = minetest.deserialize( data );
+		file:close();
+	else
+		print("[Mod mob_basics] Error: Savefile '"..tostring( path ).."' not found.");
+	end
+end
+
+
+-----------------------------------------------------------------------------------------------------
+-- A new mob has been added or a mob has been changed (i.e. new trade goods added)
+-----------------------------------------------------------------------------------------------------
+mob_basics.update = function( self, prefix )
+	if( not( self )) then
+		return;
+	end
+	-- make sure we save the current position
+	self[ prefix..'_pos' ] = self.object:getpos();	
+
+	local staticdata = self:get_staticdata();
+
+	-- deserialize to do some tests
+	local staticdata_table = minetest.deserialize( staticdata );
+	if(    not( staticdata_table[ prefix..'_name'] )
+	    or not( staticdata_table[ prefix..'_id'  ] )
+	    or not( staticdata_table[ prefix..'_typ' ] )) then
+                return;
+        end
+
+	mob_basics.known_mobs[ staticdata_table[ prefix..'_id'  ] ] = staticdata_table;
+
+	-- actually store the changed data
+	mob_basics.save_data();
+end
+
+
+-----------------------------------------------------------------------------------------------------
+-- Data about mobs that where picked up and are stored in the player's inventory is not saved here;
+-- Those mobs need to be forgotten.
+-----------------------------------------------------------------------------------------------------
+mob_basics.forget_mob = function( id )
+	mob_basics.known_mobs[ id ] = nil;
+	mob_basics.save_data();
+end
+	
 
 -----------------------------------------------------------------------------------------------------
 -- return a list of all known mob types which use prefix 
@@ -159,6 +235,8 @@ end
 -----------------------------------------------------------------------------------------------------
 mob_basics.config_mob = function( self, player, menu_path, prefix, formname, fields )
 
+	local mob_changed = false; -- do we need to store the changes? There might be multiple changes in one go
+
 	-- change texture
 	if( menu_path and #menu_path>3 and menu_path[2]=='config' and menu_path[3]=='texture' ) then
 		local nr = tonumber( menu_path[4] );
@@ -167,12 +245,14 @@ mob_basics.config_mob = function( self, player, menu_path, prefix, formname, fie
 			self[ prefix..'_texture'] = mob_basics.TEXTURES[ nr ];
 			self.object:set_properties( { textures = { self[ prefix..'_texture'] }});
 		end
+		mob_changed = true;
 
 	-- change animation (i.e. sit, walk, ...)
 	elseif( menu_path and #menu_path>3 and menu_path[2]=='config' and menu_path[3]=='anim' ) then
 		self[ prefix..'_animation'] = menu_path[4];
 		self.object:set_animation({x=self.animation[ self[ prefix..'_animation']..'_START'], y=self.animation[ self[ prefix..'_animation']..'_END']},
 				self.animation_speed-5+math.random(10));
+		mob_changed = true;
 	end
 
 	
@@ -192,6 +272,7 @@ mob_basics.config_mob = function( self, player, menu_path, prefix, formname, fie
 			fields['MOBname']..'\".');
 		self[ prefix..'_name'] = fields['MOBname'];
 		formspec = formspec..'label[3.0,1.5;Renamed successfully.]';
+		mob_changed = true;
 
 	-- height has to be at least halfway reasonable
 	elseif( fields['MOBheight'] and fields['MOBheight']>20 and fields['MOBheight']<300 
@@ -200,6 +281,7 @@ mob_basics.config_mob = function( self, player, menu_path, prefix, formname, fie
 		local new_height = math.floor((fields['MOBheight']/1.8) +0.5)/100.0;
 		mob_basics.update_visual_size( self, {x=self[ prefix..'_vsize'].x, y=new_height, z=self[ prefix..'_vsize'].z}, false, prefix );
 		formspec = formspec..'label[3.0,1.5;Height changed to '..tostring( self[ prefix..'_vsize'].y*180)..' cm.]';
+		mob_changed = true;
 
 	-- width (x and z direction) has to be at least halfway reasonable
 	elseif( fields['MOBwidth'] and fields['MOBwidth']>50 and fields['MOBwidth']<150 
@@ -208,6 +290,12 @@ mob_basics.config_mob = function( self, player, menu_path, prefix, formname, fie
 		local new_width  = math.floor(fields['MOBwidth'] +0.5)/100.0;
 		mob_basics.update_visual_size( self, {x=new_width, y=self[ prefix..'_vsize'].y, z=new_width}, false, prefix );
 		formspec = formspec..'label[3.0,1.5;Width changed to '..tostring( self[ prefix..'_vsize'].x*100)..'%.]';
+		mob_changed = true;
+	end
+
+	-- save only if there where any actual changes
+	if( mob_changed ) then
+		mob_basics.update( self, prefix );
 	end
 
 	local npc_id = self[ prefix..'_id'];
@@ -362,6 +450,11 @@ mob_basics.initialize_mob = function( self, mob_name, mob_typ, mob_owner, mob_ho
 				z=math.floor(self[ prefix..'_pos'].z)
 			})..'-'..self.trader_name;
 
+	-- does a mob with that id exist already?
+	if( mob_basics.known_mobs[ uniq_id ] ) then
+		return false;
+	end
+
 	-- mobs flying in the air would be odd
 	self.object:setvelocity(    {x=0, y=  0, z=0});
 	self.object:setacceleration({x=0, y=-10, z=0});
@@ -374,6 +467,7 @@ mob_basics.initialize_mob = function( self, mob_name, mob_typ, mob_owner, mob_ho
 		return false;
 	else
 		self[ prefix..'_id'] = uniq_id;
+		mob_basics.update( self, prefix ); -- store the newly created mob
 		return true;
 	end
 end
@@ -387,11 +481,16 @@ mob_basics.spawn_mob = function( pos, mob_typ, player_name, mob_entity_name, pre
 	-- slightly above the position of the player so that it does not end up in a solid block
 	local object = minetest.env:add_entity( {x=pos.x, y=(pos.y+1.5), z=pos.z}, mob_entity_name );
 	if( not( initialize )) then
+		if( object ~= nil ) then
+			local self = object:get_luaentity();
+			mob_basics.update( self, prefix ); -- a mob has been added
+		end
 		return;
 	end
 	if object ~= nil then
 		object:setyaw( -1.14 );
 		local self = object:get_luaentity();
+		-- initialize_mob does a mob_basics.update() already
 		if( mob_basics.initialize_mob( self, nil, mob_typ, player_name, pos, prefix )) then
 
 			mob_basics.log( 'Spawned mob', self, prefix );
@@ -410,6 +509,7 @@ mobf_trader_spawn_trader = mob_basics.spawn_mob;
 -----------------------------------------------------------------------------------------------------
 -- handle input from a chat command to spawn a mob
 -----------------------------------------------------------------------------------------------------
+-- TODO: allow limited spawn of mobs (i.e. x mobs/player)
 mob_basics.handle_chat_command = function( name, param, prefix, mob_entity_name )
 
 	if( param == "" or param==nil) then

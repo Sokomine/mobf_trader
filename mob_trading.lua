@@ -4,9 +4,12 @@
 --      mob_trading.show_trader_formspec( self, player, menu_path, fields )
 --  All other functions are more or less internal.
 ----------------------------------------------------------------------------
+-- Note: group:bla would be handy for prices, but implementing that costs too much
+--       while not gaining much (there are alternate prices after all).
+-- Note: A limit of x items/hour would be handy as well; except that it can be doe
+--       with less effort if the trader uses a trade chest that handles the
+--       refilling after some time.
 
--- TODO: limit offer to x items/hour?
--- TODO: accept group:bla for prices as well? could be very practical (but would also be a lot of work)
 
 -- contains mostly defines and functions
 mob_trading = {};
@@ -142,6 +145,7 @@ mob_trading.show_trader_formspec = function( self, player, menu_path, fields, tr
 			table.remove( trader_goods, edit_nr );
 			self.trader_goods       = trader_goods;
 			minetest.chat_send_player( pname, self.trader_name..': Deleted. This trade is no longer offered.');
+			mob_basics.update( self, 'trader' ); -- save the new goods list
 		end
 		-- display all offers (minus the deleted one)
 		menu_path[2] = nil;
@@ -633,6 +637,7 @@ mob_trading.store_trade_offer_changes = function( self, pname,  menu_path, field
 			
 		-- display the newly stored offer
 		minetest.chat_send_player( pname, self.trader_name..': Your new offer has been added.');
+		mob_basics.update( self, 'trader'); -- store new offer
 
 		-- make sure the new offer is selected and displayed when this function here continues
 		menu_path[2] = #trader_goods;
@@ -646,6 +651,7 @@ mob_trading.store_trade_offer_changes = function( self, pname,  menu_path, field
 			self.trader_goods       = trader_goods;
 			minetest.chat_send_player( pname, self.trader_name..': The offer has been changed.');
 		end
+		mob_basics.update( self, 'trader'); -- store changed offer
 		-- display the modified offer
 		menu_path[2] = edit_nr;
 		menu_path[3] = nil;
@@ -776,6 +782,7 @@ mob_trading.show_trader_formspec_limits = function( self, player, menu_path, fie
 				'button[3.0,3.5;2,0.5;'..npc_id..'_limitlist;Abort]';
 
 			minetest.show_formspec( pname, "mob_trading:trader", formspec );
+			mob_basics.update( self, 'trader'); -- store current limitations
 			return;
 		end
 	end
@@ -838,6 +845,8 @@ mob_trading.show_trader_formspec_limits = function( self, player, menu_path, fie
 	if( selected > #items ) then
 		selected = 1;
 	end
+
+	mob_basics.update( self, 'trader'); -- store current limitations
 
 	formspec = formspec..';'..selected..']';
 
@@ -1443,6 +1452,7 @@ mob_trading.do_trade = function( self, player, menu_path, trade_details, counted
 				' (owned by '..tostring(        self.trader_owner )..')'..
 				' typ:'..tostring(              self.trader_typ or '?' )..'.');
 
+	mob_basics.update( self, 'trader'); -- store updated statistic of sold items
 
 	return {msg='You got '..trader_can_trade.price_desc..' for your '..player_can_trade.price_desc..
 			'. Thank you! Would you like to trade more?', success=true};

@@ -98,6 +98,10 @@ mobf_trader.trader_entity_prototype = {
 
 	-- Information that is specific to this particular trader
 	get_staticdata = function(self)
+		-- traders of a standard type do not save their list of goods
+		if( self and self.trader_typ and self.trader_typ ~= 'individual' ) then
+			self.trader_goods = {};
+		end
 		return minetest.serialize( {
 				trader_name      = self.trader_name,
 				trader_typ       = self.trader_typ,
@@ -188,6 +192,7 @@ mobf_trader.trader_entity_prototype = {
 		    or not( mob_basics.mob_types[ 'trader' ][ self.trader_typ ] )) then
 
 			self.object:remove();
+			return;
 		else
 			self.hp_max = 100;
 		end
@@ -209,7 +214,7 @@ mobf_trader.trader_entity_prototype = {
 	-- show the trade menu
 	on_rightclick = function(self, clicker)
 
-		if( not( self) or not( clicker )) then
+		if( not( self) or not( clicker ) or not( self.trader_typ ) or not( mob_basics.mob_types[ 'trader' ][ self.trader_typ ])) then
 			return;
 		end
 
@@ -334,3 +339,6 @@ dofile(minetest.get_modpath("mobf_trader").."/trader_farming.lua");   -- they se
 dofile(minetest.get_modpath("mobf_trader").."/trader_flowers.lua");   -- flowers and other plants from default (cactus, papyrus, ..)
 dofile(minetest.get_modpath("mobf_trader").."/trader_ores.lua");      -- sells ores for tree/wood and food (both needed for further mining)
 
+
+-- read information about known mob entities from a savefile
+mob_basics.restore_data();
