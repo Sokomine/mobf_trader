@@ -466,7 +466,7 @@ mob_basics.initialize_mob = function( self, mob_name, mob_typ, mob_owner, mob_ho
 
 	-- create unique ID for the mob
 	-- uniq_id: time in seconds, _, adress of entitty data, _, prefix
-	local uniq_id = os.time()..'_'..string.sub( tostring(self), 8 )..'_'..prefix;
+	local uniq_id = os.time()..'.'..string.sub( tostring(self), 8 )..'.'..prefix;
 
 	-- does a mob with that id exist already?
 	if( mob_basics.known_mobs[ uniq_id ] ) then
