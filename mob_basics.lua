@@ -464,14 +464,9 @@ mob_basics.initialize_mob = function( self, mob_name, mob_typ, mob_owner, mob_ho
 
 	mob_basics.update_visual_size( self, nil, true, prefix ); -- generate random visual size
 
--- TODO: select a better uniq_id (i.e. time incl. microseconds)
-	-- create unique ID for this trader; floor is used to make the ID shorter (two mobs at the
-	-- same place would be confusing anyway)
-	local uniq_id = minetest.pos_to_string( {
-				x=math.floor(self[ prefix..'_pos'].x),
-				y=math.floor(self[ prefix..'_pos'].y),
-				z=math.floor(self[ prefix..'_pos'].z)
-			})..'-'..self.trader_name;
+	-- create unique ID for the mob
+	-- uniq_id: time in seconds, _, adress of entitty data, _, prefix
+	local uniq_id = os.time()..'_'..string.sub( tostring(self), 8 )..'_'..prefix;
 
 	-- does a mob with that id exist already?
 	if( mob_basics.known_mobs[ uniq_id ] ) then
