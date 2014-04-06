@@ -741,9 +741,9 @@ mob_basics.mob_list_formspec = function( player, formname, fields )
 					tostring( math.floor( distance )  )..','.. -- right-aligned
 					tostring( data[ 'mob_prefix'     ] or '')..','.. -- centered
 					tostring( data[ prefix..'_typ'   ] or '')..','.. 
-					tostring( data[ prefix..'_pos'].x )..','.. -- right-aligned
-					tostring( data[ prefix..'_pos'].y )..','..
-					tostring( data[ prefix..'_pos'].z )..','..
+					tostring( math.floor(data[ prefix..'_pos'].x ))..','.. -- right-aligned
+					tostring( math.floor(data[ prefix..'_pos'].y ))..','..
+					tostring( math.floor(data[ prefix..'_pos'].z ))..','..
 					tostring( data[ prefix..'_name'  ] or '')..','..
 					tostring( data[ prefix..'_owner' ] or '')..','; -- left aligned
 				if( data[ prefix..'_owner' ] and data[ prefix..'_owner'] == pname ) then
