@@ -285,12 +285,24 @@ mob_basics.config_mob = function( self, player, menu_path, prefix, formname, fie
 	end
 	-- rename a mob
 	if( fields['MOBname'] and fields['MOBname'] ~= "" and fields['MOBname'] ~= self[ prefix..'_name'] ) then
-		minetest.chat_send_player( player:get_player_name(),
-			'Your mob has been renamed from \"'..tostring( self[ prefix..'_name'] )..'\" to \"'..
-			fields['MOBname']..'\".');
-		self[ prefix..'_name'] = fields['MOBname'];
-		formspec = formspec..'label[3.0,1.5;Renamed successfully.]';
-		mob_changed = true;
+
+		if( string.len(fields['MOBname']) < 2 or string.len(fields['MOBname']) > 40 ) then
+			minetest.chat_send_player( player:get_player_name(),
+				"Sorry. This name is not allowed. The name has to be between 2 and 40 letters long.");
+		elseif( not( fields['MOBname']:match("^[A-Za-z0-9%_%-% ]+$"))) then
+			minetest.chat_send_player( player:get_player_name(),
+				"Sorry. The name may only contain letters, numbers, _, - and blanks.");
+		elseif( minetest.check_player_privs( fields['MOBname'], {shout=true})) then
+			minetest.chat_send_player( player:get_player_name(),
+				"Sorry. The name may not be the same as that one of a player.");
+		else
+			minetest.chat_send_player( player:get_player_name(),
+				'Your mob has been renamed from \"'..tostring( self[ prefix..'_name'] )..'\" to \"'..
+				fields['MOBname']..'\".');
+			self[ prefix..'_name'] = fields['MOBname'];
+			formspec = formspec..'label[3.0,1.5;Renamed successfully.]';
+			mob_changed = true;
+		end
 
 	-- height has to be at least halfway reasonable
 	elseif( fields['MOBheight'] and fields['MOBheight']>20 and fields['MOBheight']<300 
@@ -765,4 +777,3 @@ end
 --                                trader_birthtime = self.trader_birthtime,
 --                                trader_id        = self.trader_id,
 --                                trader_texture   = self.trader_texture,
--- TODO: check if input is valid for name etc.
