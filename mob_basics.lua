@@ -32,7 +32,8 @@ mob_basics.TEXTURES = {'kuhhaendler.png', 'bauer_in_sonntagskleidung.png', 'baeu
 -- keep a list of all mobs that are handled by this mod
 mob_basics.known_mobs = {}
 
-
+-- this is a list of the indices of mob_basics.known_mobs needed for the /moblist command
+mob_basics.mob_list = {};
 
 -----------------------------------------------------------------------------------------------------
 -- Logging is important for debugging
@@ -83,10 +84,20 @@ mob_basics.restore_data = function()
 		local data = file:read("*all");
 		mob_basics.known_mobs = minetest.deserialize( data );
 		file:close();
+
+		-- this is also a good time to create a list of all mobs which is used for /moblist
+		mob_basics.mob_list = {};
+		for k,v in pairs( mob_basics.known_mobs ) do
+			table.insert( mob_basics.mob_list, k );
+		end
 	else
 		print("[Mod mob_basics] Error: Savefile '"..tostring( path ).."' not found.");
 	end
 end
+
+-- read information about known mob entities from a savefile
+-- (do this once at each startup)
+mob_basics.restore_data();
 
 
 -----------------------------------------------------------------------------------------------------
@@ -109,10 +120,15 @@ mob_basics.update = function( self, prefix )
                 return;
         end
 
+	-- if it is a new mob, register it in the list
+	if( not( mob_basics.known_mobs[ staticdata_table[ prefix..'_id'  ] ] )) then
+		table.insert( mob_basics.mob_list, staticdata_table[ prefix..'_id'  ] );
+	end
 	mob_basics.known_mobs[ staticdata_table[ prefix..'_id'  ] ] = staticdata_table;
 
 	-- actually store the changed data
 	mob_basics.save_data();
+--minetest.chat_send_player('singleplayer','UPDATING MOB '..tostring( self[ prefix..'_id'] )); 
 end
 
 
@@ -123,6 +139,8 @@ end
 mob_basics.forget_mob = function( id )
 	mob_basics.known_mobs[ id ] = nil;
 	mob_basics.save_data();
+--minetest.chat_send_player('singleplayer','FORGETTING MOB '..tostring( id )); 
+	-- the mob does *not* get deleted out of mob_basics.known_mobs because that would screw up the list
 end
 	
 
@@ -345,6 +363,10 @@ end
 -----------------------------------------------------------------------------------------------------
 mob_basics.form_input_handler = function( player, formname, fields)
 
+	if( formname and formname == "mob_basics:mob_list" ) then
+		mob_basics.mob_list_formspec( player, formname, fields );
+		return;
+	end
 	-- are we responsible to handle this input?
 	if( not( formname ) or formname ~= "mob_trading:trader" ) then -- TODO
 		return false;
@@ -374,8 +396,9 @@ mob_basics.form_input_handler = function( player, formname, fields)
 				-- pick the mob up
 				if( v=='Take' ) then 
 					if( mob_pickup and mob_pickup.pick_mob_up ) then
-						-- all these mobs do have a unique id and are personalized, so the last parameter is true
-						mob_pickup.pick_mob_up(   self, player, menu_path, prefix, true );
+						-- all these mobs do have a unique id and are personalized, so the parameter before the last one is true
+						-- we really want to pick up the mob - so the very last parameter is nil (not only a copy)
+						mob_pickup.pick_mob_up(   self, player, menu_path, prefix, true, nil);
 					end
 					return true;
 
@@ -466,6 +489,10 @@ mob_basics.initialize_mob = function( self, mob_name, mob_typ, mob_owner, mob_ho
 		self.object:remove();
 		return false;
 	else
+		-- if the mob was already known under a temporary id
+		if( self[ prefix..'_id'] ) then
+			mob_basics.forget_mob( self[ prefix..'_id'] )
+		end
 		self[ prefix..'_id'] = uniq_id;
 		mob_basics.update( self, prefix ); -- store the newly created mob
 		return true;
@@ -543,3 +570,204 @@ mob_basics.handle_chat_command = function( name, param, prefix, mob_entity_name 
 	mob_basics.spawn_mob( pos, param, name, mob_entity_name, prefix, true );
 end
 
+
+
+-----------------------------------------------------------------------------------------------------
+-- It is sometimes helpful to be able to figure out where the traders and other mobs actually are
+-- and where the nearest one can be found.
+-- This is also useful for restoring mobs after a /clearallobjects.
+-----------------------------------------------------------------------------------------------------
+minetest.register_chatcommand( 'moblist', {
+        params = "<trader type>",
+        description = "Shows a list of all mobs known to mob_basics.",
+        privs = {},
+        func = function(name, param)
+                -- this function handles the sanity checks and the actual spawning
+                return mob_basics.mob_list_formspec( minetest.get_player_by_name( name ), "mob_basics:mob_list", {});
+        end
+});
+
+-----------------------------------------------------------------------------------------------------
+-- show a list of existing mobs and their positions
+-----------------------------------------------------------------------------------------------------
+mob_basics.mob_list_formspec = function( player, formname, fields )
+
+	if( not( player ) or fields.quit) then
+		return
+	end
+	local pname = player:get_player_name();
+	local ppos  = player:getpos();
+
+	local search_for  = nil;
+	local id_found    = nil;
+	local col         = 0;
+	local text        = '';
+	if( fields and fields.mob_list and not( fields.back )) then
+
+		local row = 1;
+		local selection =  minetest.explode_table_event( fields.mob_list );
+                if( selection ) then
+			row = selection.row;
+			col = selection.column;
+		end
+		if( not( row ) or row > #mob_basics.mob_list or row < 1 or not( mob_basics.known_mobs[ mob_basics.mob_list[ row ]])) then
+			row = 1;	-- default to first row
+		end
+		if( not( col ) or col < 1 or col > 10 ) then
+			col = 0; 	-- default to no limitation
+		end
+
+		local data = mob_basics.known_mobs[ mob_basics.mob_list[ row ]];
+		if( not( data )) then
+			data = {};
+		end
+		local prefix = data['mob_prefix'];
+		if( not( prefix )) then
+			prefix = 'trader';
+		end
+		local mpos   = data[ prefix..'_pos'];
+		if( not( prefix )) then
+			prefix = 'trader';
+		end
+		if(     col == 1 ) then
+			search_for = math.ceil( math.sqrt(((ppos.x-mpos.x)*(ppos.x-mpos.x))
+					 	 	+ ((ppos.y-mpos.y)*(ppos.y-mpos.y))
+						 	+ ((ppos.z-mpos.z)*(ppos.z-mpos.z))));
+			text       = 'Mobs that are less than '..tostring( search_for )..' m away from you'; 
+		elseif( col == 2 ) then -- same prefix
+			search_for = prefix;
+			text       = 'Mobs of typ \''..tostring( search_for )..'\'';
+		elseif( col == 3 ) then 
+			search_for = data[ prefix..'_typ'];
+			text       = 'Mobs of the subtyp \''..tostring( search_for )..'\'';
+		-- 4, 5 and 6 store the mobs position
+		elseif( col == 7 ) then 
+			search_for = data[ prefix..'_name'];
+			text       = 'Mobs with the name \''..tostring( search_for )..'\'';
+		elseif( col == 8 ) then 
+			search_for = data[ prefix..'_owner'];
+			text       = 'Mobs belonging to player '..tostring(search_for);
+		-- create a copy of the mob data and store that as a placeable item in the player's inventory
+		elseif( col == 9 ) then
+
+			-- actually create a copy of the mob
+			if( mob_pickup and mob_pickup.pick_mob_up ) then
+
+				local mobself = {};
+				mobself.name = 'mobf_trader:trader'; -- TODO: there may be further types in the future
+				mobself[ prefix..'_owner' ] = data[ prefix..'_owner'];
+				-- all these mobs do have a unique id and are personalized, so the parameter before the last one is true
+				-- the mob as such is not affected - we only want a copy (thus, last parameter is data)
+				mob_pickup.pick_mob_up(mobself, player, menu_path, prefix, true, minetest.serialize( data ));
+			end
+
+			id_found   = data[ prefix..'_id']; -- show details about this particular mob
+			search_for = nil;
+			col        = 0;
+		-- visit the mob
+		elseif( col == 10 ) then
+			if( not( minetest.check_player_privs(pname, {teleport=true}))) then 
+				search_for = nil;
+				col        = 0;
+				minetest.chat_send_player( pname, 'You do not have the teleport priv. Please walk there manually.');
+			elseif( mpos and mpos.x and mpos.y and mpos.z ) then
+				player:moveto( mpos, false ); -- teleport the player to the mob
+				-- TODO: check if the mob is there; if not: restore it
+				return;
+			end
+		-- else no search
+		else
+			search_for = nil;
+			col        = 0;
+		end
+
+	end
+
+	-- selections in that list lead back to the main list
+	local input_form_name = 'mob_list';
+	if( search_for ) then
+		input_form_name = 'mob_list_searched';
+	end
+	local formspec = 'size[12,12]'..
+			'button_exit[4.0,1.5;2,0.5;quit;Quit]'..
+			'tablecolumns[' ..
+--			'text,align=left;'..
+			'text,align=right;'..
+			'text,align=center;'..
+			'text,align=center;'..
+			'text,align=right;'..
+			'text,align=right;'..
+			'text,align=right;'..
+			'text,align=left;'..
+			'text,align=left;'..
+			'text,align=center;'..
+			'text,align=center]'..
+                        'table[0.1,2.7;11.4,8.8;'..input_form_name..';';
+
+	-- the list mob_basic.mob_list contains the ids of all known mobs; they act as indices for mob_basics.known_mobs;
+	-- important part: mob_basics.mob_list only gets extended but not shortened during the runtime of a server
+	for k,v in ipairs( mob_basics.mob_list ) do
+
+		local data = mob_basics.known_mobs[ v ];
+		if( data ) then
+
+			local prefix = data['mob_prefix'];
+			if( not( prefix )) then
+				prefix = 'trader';
+			end
+	
+			local mpos     = data[ prefix..'_pos'];
+			local distance = math.sqrt(((ppos.x-mpos.x)*(ppos.x-mpos.x))
+						 + ((ppos.y-mpos.y)*(ppos.y-mpos.y))
+						 + ((ppos.z-mpos.z)*(ppos.z-mpos.z)));
+
+			if( not( search_for )  -- list all mobs
+				or( col==1 and search_for and search_for >= distance )               -- list all mobs less than this many m away
+				or( col==2 and search_for and search_for==data['mob_prefix'] )       -- list all mobs with the same prefix
+				or( col==3 and search_for and search_for==data[ prefix..'_typ'   ] ) --   "        "        "       typ (i.e. fruit traders)
+				or( col==7 and search_for and search_for==data[ prefix..'_name'  ] ) --   "        "        "       name
+				or( col==8 and search_for and search_for==data[ prefix..'_owner' ] ) --   "        "        "       owner
+			) then
+
+				formspec = formspec..
+--					tostring( data[ prefix..'_id'    ])..','.. -- left aligned
+					tostring( math.floor( distance )  )..','.. -- right-aligned
+					tostring( data[ 'mob_prefix'     ] or '')..','.. -- centered
+					tostring( data[ prefix..'_typ'   ] or '')..','.. 
+					tostring( data[ prefix..'_pos'].x )..','.. -- right-aligned
+					tostring( data[ prefix..'_pos'].y )..','..
+					tostring( data[ prefix..'_pos'].z )..','..
+					tostring( data[ prefix..'_name'  ] or '')..','..
+					tostring( data[ prefix..'_owner' ] or '')..','; -- left aligned
+				if( data[ prefix..'_owner' ] and data[ prefix..'_owner'] == pname ) then
+					formspec = formspec..'Copy';
+				elseif( minetest.check_player_privs( pname, {mob_pickup=true})) then
+					formspec = formspec..'Admin-Copy';
+				end
+				formspec = formspec..',Visit MOB,';
+			-- Note: The fields _sold, _goods and _limit are specific to the trader; they cannot be displayed here.
+			-- The values animation and vsize are of no intrest here (only when watching the trader).
+			-- The values home_pos, birthtime, and id could be of intrest to a limited degree (at least for admins).
+			-- texture is of intrest.
+			end
+		end
+	end
+
+ 	formspec = formspec..';]'..
+			'tabheader[0.1,2.2;spalte;Dist,Type,Subtype,X,Y,Z,Name of Mob,Owner;;true;true]';
+	if( search_for and text ) then
+		formspec = formspec..
+			'label[1.0,1.0;'..minetest.formspec_escape( text )..':]'..
+			'button[7.0,1.5;2,0.5;back;Back]';
+	end
+
+        -- display the formspec
+        minetest.show_formspec( pname, "mob_basics:mob_list", formspec );
+end
+
+-- TODO: show additional data
+--                                trader_home_pos  = self.trader_home_pos,
+--                                trader_birthtime = self.trader_birthtime,
+--                                trader_id        = self.trader_id,
+--                                trader_texture   = self.trader_texture,
+-- TODO: check if input is valid for name etc.

@@ -103,6 +103,7 @@ mobf_trader.trader_entity_prototype = {
 			self.trader_goods = {};
 		end
 		return minetest.serialize( {
+				mob_prefix       = 'trader',
 				trader_name      = self.trader_name,
 				trader_typ       = self.trader_typ,
 		                trader_owner     = self.trader_owner, 
@@ -163,7 +164,7 @@ mobf_trader.trader_entity_prototype = {
 		-- initialize a new trader
 		if( not( self.trader_name ) or self.trader_name=='' or self.trader_id=='') then
 			-- no name supplied - it will be choosen automaticly
-			-- TODO: the typ of trader is unknown at this stage
+			-- the typ of trader is unknown at this stage
 			local typen = mob_basics.type_list_for_prefix('trader');
 			local i     = math.random(1,#typen );
 			-- if trader_id is a duplicate, this entity here (self) will be removed
@@ -340,5 +341,3 @@ dofile(minetest.get_modpath("mobf_trader").."/trader_flowers.lua");   -- flowers
 dofile(minetest.get_modpath("mobf_trader").."/trader_ores.lua");      -- sells ores for tree/wood and food (both needed for further mining)
 
 
--- read information about known mob entities from a savefile
-mob_basics.restore_data();

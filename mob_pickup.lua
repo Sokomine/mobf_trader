@@ -92,7 +92,7 @@ end
 -----------------------------------------------------------------------------------------------------
 -- the mob's data will be saved and he can be placed at another location
 -- NOTE: only mobs which are owned by the player can be picked up (unless the player has the mob_pickup priv)
-mob_pickup.pick_mob_up = function( self, player, menu_path, prefix, is_personalized )
+mob_pickup.pick_mob_up = function( self, player, menu_path, prefix, is_personalized, stored_data )
 
 	if( not( self ) or not( player ) or not(self.name)) then
 		return;
@@ -110,7 +110,12 @@ mob_pickup.pick_mob_up = function( self, player, menu_path, prefix, is_personali
 	end
 
 
-	local staticdata = self:get_staticdata();
+	local staticdata = {};
+	if( not( stored_data )) then
+		staticdata = self:get_staticdata();
+	else
+		staticdata = stored_data;
+	end
 
 	-- deserialize to do some tests
 	local staticdata_table = minetest.deserialize( staticdata );
@@ -125,7 +130,7 @@ mob_pickup.pick_mob_up = function( self, player, menu_path, prefix, is_personali
 
 	-- is picking this mob up allowed?
 	local deny = mob_pickup.deny_pickup[ self.name ];
-	if( deny ) then
+	if( not( stored_data ) and deny ) then
 		local deny_msg = deny( self, player );
 		if( deny_msg ~= '') then
 			minetest.chat_send_player( pname,
@@ -160,6 +165,14 @@ mob_pickup.pick_mob_up = function( self, player, menu_path, prefix, is_personali
 	-- save the changed table
 	mob_as_item:replace( item );
 
+	if( stored_data ) then
+		minetest.chat_send_player( pname,
+			'A copy of the mob has been dropped into your inventory.');
+		-- put the copy of the mob into the players inventory
+		player_inv:add_item( "main", mob_as_item );
+		-- do not remove the mob
+		return;
+	end
 	minetest.chat_send_player( pname,
 		mob_pickup.pickup_success_msg[ self.name ] ); 
 
@@ -243,6 +256,7 @@ mob_pickup.place_mob = function( itemstack, placer, pointed_thing, prefix, entit
 
 
 	local self = object:get_luaentity();
+	local tmp_id = self[ prefix..'_id'];
 
 	-- transfer the data to the mob object
 	for k,v in pairs( data ) do
@@ -268,6 +282,7 @@ mob_pickup.place_mob = function( itemstack, placer, pointed_thing, prefix, entit
 
 	mob_pickup.log( pname..' placed', self, prefix ); 
 
+	mob_basics.forget_mob( tmp_id );
 	mob_basics.update( self, prefix ); -- store data about this placed mob
 	return '';
 end
