@@ -160,6 +160,32 @@ end
 
 
 
+-----------------------------------------------------------------------------------------------------
+-- return the mobs owned by pname
+-----------------------------------------------------------------------------------------------------
+-- if prefix is nil, then all mobs owned by the player will be returned
+mob_basics.mob_id_list_by_player = function( pname, search_prefix )
+	local res = {};
+		
+	if( not( pname )) then
+		return res;
+	end
+	for k,v in ipairs( mob_basics.mob_list ) do
+
+		local data = mob_basics.known_mobs[ v ];
+		if( data ) then
+
+			local prefix = data['mob_prefix'];
+			if( (not( search_prefix ) or search_prefix == prefix)
+				and data[ prefix..'_owner']
+				and data[ prefix..'_owner']==pname ) then
+				table.insert( res, v );
+			end
+		end
+	end
+	return res;
+end
+
 
 
 -----------------------------------------------------------------------------------------------------
@@ -543,7 +569,6 @@ mobf_trader_spawn_trader = mob_basics.spawn_mob;
 -----------------------------------------------------------------------------------------------------
 -- handle input from a chat command to spawn a mob
 -----------------------------------------------------------------------------------------------------
--- TODO: allow limited spawn of mobs (i.e. x mobs/player)
 mob_basics.handle_chat_command = function( name, param, prefix, mob_entity_name )
 
 	if( param == "" or param==nil) then

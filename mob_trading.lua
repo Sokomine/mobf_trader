@@ -21,6 +21,7 @@ mob_trading.MAX_ALTERNATE_PAYMENTS    = 6; -- up to 6 diffrent payments are poss
 mob_trading.LOCKED_CHEST_SEARCH_RANGE = 3;
 
 mob_trading.KNOWN_LOCKED_CHESTS = {'default:chest_locked',        'locks:shared_locked_chest', 
+				 'mobf_trader:large_chest',
 				 'technic:iron_locked_chest',   'technic:copper_locked_chest',
 				 'technic:silver_locked_chest', 'technic:gold_locked_chest'};
 

@@ -24,12 +24,17 @@ Features:
 mobf_trader = {}
 
 
+mobf_trader.MAX_TRADER_PER_PLAYER = 2; -- players can only have this many traders
+mobf_trader.MAX_MOBS_PER_PLAYER   = 2; -- ..and this many mobs alltogether
+
+mobf_trader.TRADER_PRICE = 'default:gold_ingot 12';
 
 
 
 dofile(minetest.get_modpath("mobf_trader").."/mob_basics.lua");    -- basic functionality: onfig, spawn, ...
 dofile(minetest.get_modpath("mobf_trader").."/mob_pickup.lua");    -- pick trader up/place again
 dofile(minetest.get_modpath("mobf_trader").."/mob_trading.lua");   -- the actual trading code - complete with formspecs
+dofile(minetest.get_modpath("mobf_trader").."/large_chest.lua");   -- one large chest is easier to handle than a collectoin of chests
 --TODO dofile(minetest.get_modpath("mobf_trader").."/mob_sitting.lua");   -- allows the mob to sit/lie on furniture
 
 
@@ -314,6 +319,24 @@ mob_pickup.register_mob_for_pickup( 'mobf_trader:trader', 'mobf_trader:trader_it
 		if( data and not( mob_basics.mob_types[ 'trader' ][ data[ 'trader_typ']])) then
 			return 'Error: The typ of this trader is unkown. Cannot place him.';
 		end
+
+		if( not( player )) then
+			return '';
+		end
+		local pname = player:get_player_name();
+
+		local mobs = mob_basics.mob_id_list_by_player( player:get_player_name(), 'trader' );
+		if( #mobs >= mobf_trader.MAX_TRADER_PER_PLAYER and not( minetest.check_player_privs(name, {mob_basics_spawn=true}))) then
+			return 'Error: You are only allowed to have up to '..tostring( mobf_trader.MAX_TRADER_PER_PLAYER )..' traders '..
+				' (you have '..tostring( #mobs )..' currently).';
+		end
+
+		mobs = mob_basics.mob_id_list_by_player( pname, nil );
+		if( #mobs >= mobf_trader.MAX_MOBS_PER_PLAYER and not( minetest.check_player_privs(name, {mob_basics_spawn=true}))) then
+			return 'Error: You are only allowed to have up to '..tostring( mobf_trader.MAX_MOBS_PER_PLAYER   )..' mobs'..
+				' (you have '..tostring( #mobs )..' currently).';
+		end
+
 		return '';
 	end,
 	
