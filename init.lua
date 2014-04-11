@@ -326,13 +326,13 @@ mob_pickup.register_mob_for_pickup( 'mobf_trader:trader', 'mobf_trader:trader_it
 		local pname = player:get_player_name();
 
 		local mobs = mob_basics.mob_id_list_by_player( player:get_player_name(), 'trader' );
-		if( #mobs >= mobf_trader.MAX_TRADER_PER_PLAYER and not( minetest.check_player_privs(name, {mob_basics_spawn=true}))) then
+		if( #mobs >= mobf_trader.MAX_TRADER_PER_PLAYER and not( minetest.check_player_privs(pname, {mob_basics_spawn=true}))) then
 			return 'Error: You are only allowed to have up to '..tostring( mobf_trader.MAX_TRADER_PER_PLAYER )..' traders '..
 				' (you have '..tostring( #mobs )..' currently).';
 		end
 
 		mobs = mob_basics.mob_id_list_by_player( pname, nil );
-		if( #mobs >= mobf_trader.MAX_MOBS_PER_PLAYER and not( minetest.check_player_privs(name, {mob_basics_spawn=true}))) then
+		if( #mobs >= mobf_trader.MAX_MOBS_PER_PLAYER and not( minetest.check_player_privs(pname, {mob_basics_spawn=true}))) then
 			return 'Error: You are only allowed to have up to '..tostring( mobf_trader.MAX_MOBS_PER_PLAYER   )..' mobs'..
 				' (you have '..tostring( #mobs )..' currently).';
 		end

@@ -102,14 +102,14 @@ mobf_trader.request_trader = function( pos, player, fields )
 	end
 
 	local mobs = mob_basics.mob_id_list_by_player( pname, 'trader' );
-	if( #mobs >= mobf_trader.MAX_TRADER_PER_PLAYER and not( minetest.check_player_privs(name, {mob_basics_spawn=true}))) then
+	if( #mobs >= mobf_trader.MAX_TRADER_PER_PLAYER and not( minetest.check_player_privs(pname, {mob_basics_spawn=true}))) then
 		return formspec..'You are only allowed to have up to '..tostring( mobf_trader.MAX_TRADER_PER_PLAYER )..' traders '..
 				' (you have '..tostring( #mobs )..' currently).]';
 	end
 	formspec = formspec..'You currently employ '..tostring( #mobs )..' traders ('..tostring( mobf_trader.MAX_TRADER_PER_PLAYER )..' allowed).\n';
 
 	mobs = mob_basics.mob_id_list_by_player( pname, nil );
-	if( #mobs >= mobf_trader.MAX_MOBS_PER_PLAYER and not( minetest.check_player_privs(name, {mob_basics_spawn=true}))) then
+	if( #mobs >= mobf_trader.MAX_MOBS_PER_PLAYER and not( minetest.check_player_privs(pname, {mob_basics_spawn=true}))) then
 		return formspec..'You are only allowed to have up to '..tostring( mobf_trader.MAX_MOBS_PER_PLAYER   )..' mobs'..
 				' (you have '..tostring( #mobs )..' currently).]';
 	end
