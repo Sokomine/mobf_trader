@@ -1,5 +1,9 @@
 
 --[[
+Modified: 20.05.14 Added diffrent trader types for medieval villages.
+                   Those traders offer almost all items from default plus cottages.
+                   Items from animals (mobf) and bushes (plantslib) are partly included.
+
 Features:
  * supports up to 16 different trade offers (for more, space might get too tight in the formspec)
  * up to three diffrent payments can be offered per trade offer (if more, space might get too tight in the formspec)
@@ -362,5 +366,6 @@ dofile(minetest.get_modpath("mobf_trader").."/trader_animals.lua");   -- buy ani
 dofile(minetest.get_modpath("mobf_trader").."/trader_farming.lua");   -- they sell seeds and fruits - good against hunger! also contains special seeds trader
 dofile(minetest.get_modpath("mobf_trader").."/trader_flowers.lua");   -- flowers and other plants from default (cactus, papyrus, ..)
 dofile(minetest.get_modpath("mobf_trader").."/trader_ores.lua");      -- sells ores for tree/wood and food (both needed for further mining)
+dofile(minetest.get_modpath("mobf_trader").."/trader_village.lua");   -- historic occupations that can be found in medieval villages
 
 
