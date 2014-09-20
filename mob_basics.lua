@@ -20,7 +20,8 @@ mob_basics = {}
 mob_basics.mob_types = {}
 
 -- if you want to add a new texture, do it here
-mob_basics.TEXTURES = {'kuhhaendler.png', 'bauer_in_sonntagskleidung.png', 'baeuerin.png', 'character.png', 'wheat_farmer_by_addi.png' };
+mob_basics.TEXTURES = {'kuhhaendler.png', 'bauer_in_sonntagskleidung.png', 'baeuerin.png', 'character.png', 'wheat_farmer_by_addi.png', 'tomatenhaendler.png', 'blacksmith.png',
+			'holzfaeller.png' };
 -- further good looking skins:
 --mob_basics.TEXTURES = {'kuhhaendler.png', 'bauer_in_sonntagskleidung.png', 'baeuerin.png', 'character.png', 'wheat_farmer_by_addi.png',
 --			"pawel04z.png", "character.png", "skin_2014012302322877138.png",
@@ -384,7 +385,7 @@ mob_basics.config_mob = function( self, player, menu_path, prefix, formname, fie
 			label = 'current';
 		end
 		formspec = formspec..
-			'image_button['..tostring((i%8)*1.1-1.0)..','..tostring(math.ceil(i/8)*1.1+1.2)..
+			'image_button['..tostring(((i-1)%8)*1.1-1.0)..','..tostring(math.ceil((i-1)/8)*1.1+1.2)..
 					';1.0,1.0;'..v..';'..npc_id..'_config_texture_'..tostring(i)..';'..label..']';
 	end
 
@@ -538,6 +539,13 @@ end
 -----------------------------------------------------------------------------------------------------
 mob_basics.spawn_mob = function( pos, mob_typ, player_name, mob_entity_name, prefix, initialize )
 
+	print('Trying to spawn '..tostring( mob_entity_name )..' of type '..tostring( mob_typ )..' at '..minetest.pos_to_string( pos ));
+	-- spawning from random_buildings
+	if( not( mob_entity_name ) and not( prefix )) then
+		mob_entity_name = 'mobf_trader:trader';
+		prefix          = 'trader';
+		initialize      = true;
+	end
 	-- slightly above the position of the player so that it does not end up in a solid block
 	local object = minetest.env:add_entity( {x=pos.x, y=(pos.y+1.5), z=pos.z}, mob_entity_name );
 	if( not( initialize )) then
@@ -564,6 +572,9 @@ end
 
 -- compatibility function for random_buildings
 mobf_trader_spawn_trader = mob_basics.spawn_mob;
+
+mobf_trader = {};
+mobf_trader.spawn_trader = mob_basics.spawn_mob;
 
 
 -----------------------------------------------------------------------------------------------------
