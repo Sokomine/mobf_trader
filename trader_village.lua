@@ -43,7 +43,7 @@ mobf_trader.add_trader( mobf_trader.npc_trader_prototype,
 
 		{ 'default:steel_ingot',    mobf_trader.price_smith( 1, 0, 0 ) },
 
-		{ 'default:chest_locked',   {'default:tree 4', 'default:iron_lump 2', 'default:coal 2'}},
+		{ 'default:chest_locked',   {'default:tree 4', 'default:iron_lump 2', 'default:coal_lump 2'}},
 		{ 'bucket:bucket_empty',    mobf_trader.price_smith( 3, 0, 0 ) },
 		{ 'doors:door_steel',       mobf_trader.price_smith( 6, 0, 0 ) },
 		{ 'cottages:hatch_steel',   mobf_trader.price_smith( 2, 0, 0 ) },
@@ -122,7 +122,7 @@ mobf_trader.add_trader( mobf_trader.npc_trader_prototype,
 		-- this is a useful and rather expensive item; it seperates harvested wheat into straw and seeds
 		{ 'cottages:threshing_floor',  {'default:tree 4', 'default:chest', 'default:chest_locked 2', 'default:pick_bronze' }},
 		-- the mill allows to craft wheat seeds into flour
-		{ 'cottages:handmill',         {'default:tree 12', 'default:coal 24', 'default:steel_ingot', 'default:pick_bronze' }},
+		{ 'cottages:handmill',         {'default:tree 12', 'default:coal_lump 24', 'default:steel_ingot', 'default:pick_bronze' }},
 
 		-- stairs and slabs are sold in larger quantities
 		{ 'stairs:stair_cobble 12',    mobf_trader.price_stonemason(12, 0, 0 ) }, 
@@ -364,7 +364,7 @@ mobf_trader.add_trader( mobf_trader.npc_trader_prototype,
 	'baker', 
 	'baker', 
 	{
-		{ 'farming:bread 6',                {'farming:flour 10', 'default:coal 3'}},
+		{ 'farming:bread 6',                {'farming:flour 10', 'default:coal_lump 3'}},
 		{ 'bushes:blueberry_pie_slice',     {'default:papyrus 2'}},
 
 		{ 'bushes:blackberry_pie_cooked',   {'bushes:blackberry 9', 'default:coal_lump 2'}}, 
@@ -374,8 +374,8 @@ mobf_trader.add_trader( mobf_trader.npc_trader_prototype,
 		{ 'bushes:raspberry_pie_cooked',    {'bushes:raspberry 9', 'default:coal_lump 2'}}, 
 		{ 'bushes:strawberry_pie_cooked',   {'bushes:strawberry 9', 'default:coal_lump 2'}}, 
 
-		{ 'farming:bread 34',               {'farming:flour 49', 'default:coal 12'}},
-		{ 'farming:bread 80',               {'farming:flour 90', 'default:coal 20'}},
+		{ 'farming:bread 34',               {'farming:flour 49', 'default:coal_lump 12'}},
+		{ 'farming:bread 80',               {'farming:flour 90', 'default:coal_lump 20'}},
 
 		{ 'bushes:basket_blackberry',       {'bushes:blackberry 24', 'default:coal_lump 2'}}, 
 		{ 'bushes:basket_blueberry',        {'bushes:blueberry 24', 'default:coal_lump 2'}}, 
@@ -414,23 +414,33 @@ mobf_trader.add_trader( mobf_trader.npc_trader_prototype,
 	);
 	
 
--- potterer (Toepfer) - also works as a bricklayer (=Maurer)
+-- potterer (Toepfer)
+-- TODO: the potterer could have more work to do...
 mobf_trader.add_trader( mobf_trader.npc_trader_prototype,
 	'potterer',
 	'potterer',
 	{
 		{'default:clay_lump 2',             'default:coal_lump'},
 		{'default:clay 6',                  {'default:shovel_stone'}},
-		{'default:clay_brick 8',            {'default:shovel_stone', 'default:coal_lump 2'}},
-		{'default:brick 12',                {'default:shovel_steel', 'default:coal_lump 12'}},
-		{'stairs:stair_brick 8',            {'default:shovel_stone', 'default:coal_lump 12'}},
-		{'stairs:slab_brick 6',             {'default:shovel_stone', 'default:coal_lump 3'}},
 		{'cottages:washing',                'default:shovel_steel'}, -- 1 clay
 	},
 	{ 'Peter', 'Paul' },
 	''
 	);
 	
+-- a bricklayer
+mobf_trader.add_trader( mobf_trader.npc_trader_prototype,
+	'bricklayer',
+	'bricklayer',
+	{
+		{'default:clay_brick 8',            {'default:shovel_stone', 'default:coal_lump 2'}},
+		{'default:brick 12',                {'default:shovel_steel', 'default:coal_lump 12'}},
+		{'stairs:stair_brick 8',            {'default:shovel_stone', 'default:coal_lump 12'}},
+		{'stairs:slab_brick 6',             {'default:shovel_stone', 'default:coal_lump 3'}},
+	},
+	{ 'Billy' },
+	''
+	);
 
 -- someone has to color the wool
 mobf_trader.add_trader( mobf_trader.npc_trader_prototype,
@@ -486,18 +496,34 @@ mobf_trader.add_trader( mobf_trader.npc_trader_prototype,
 	'glassmaker',
 	'glassmaker',
 	{
-		{'default:glass 2',                 {'default:sand 1',  'default:coal 3'}},
-		{'default:glass 12',                {'default:sand 5',  'default:coal 9',  'default:shovel_stone'}},
-		{'default:glass 48',                {'default:sand 19', 'default:coal 30', 'default:shovel_steel'}},
+		{'default:glass 2',                 {'default:sand 1',  'default:coal_lump 3'}},
+		{'default:glass 12',                {'default:sand 5',  'default:coal_lump 9',  'default:shovel_stone'}},
+		{'default:glass 48',                {'default:sand 19', 'default:coal_lump 30', 'default:shovel_steel'}},
 		{'default:obsidian_glass 2',        {'default:obsidian_shard 2', 'default:wood 2'}},
-		{'default:obsidian_glass 12',       {'default:obsidian',         'default:coal 6', 'default:shovel_stone'}},
-		{'default:obsidian_glass 48',       {'default:obsidian 4',       'default:coal 30','default:shovel_steel', 'default:pick_steel'}},
-		{'cottages:glass_pane 12',          {'default:sand 2',  'default:coal 1'}},
+		{'default:obsidian_glass 12',       {'default:obsidian',         'default:coal_lump 6', 'default:shovel_stone'}},
+		{'default:obsidian_glass 48',       {'default:obsidian 4',       'default:coal_lump 30','default:shovel_steel', 'default:pick_steel'}},
+		{'cottages:glass_pane 12',          {'default:sand 2',  'default:coal_lump 1'}},
 		{'vessels:glass_bottle',            {'default:sand',    'default:wood 1'}},
 		{'vessels:drinking_glass 2',        {'default:sand',    'default:wood 1'}},
 
 	},
 	{ 'Peter', 'Paul' },
+	''
+	);
+	
+
+-- charachoal burners (=Koehler) used to be located outside villages
+mobf_trader.add_trader( mobf_trader.npc_trader_prototype,
+	'characoal burner',
+	'charachoal',
+	{
+		{'default:coal_lump',		'default:tree 2', 'default:apple'},
+		{'default:coal_lump 12',	'default:tree 16', 'default:apple 12'},
+		{'default:coal_lump 19',	'default:tree 25', 'farming:bread 2', 'default:apple 19', 'bucket:bucket_empty'},
+		{'default:coalblock',		'default:tree 12', 'farming:bread 1', 'default:apple 9'},
+		{'default:coalblock 9',	        'default:tree 99', 'farming:bread 8'},
+	},
+	{ 'Christian', 'Rauchi' },
 	''
 	);
 	
@@ -512,6 +538,7 @@ mobf_trader.village_jobs = {
 	mill      = {'miller'},
 	bakery    = {'baker'},
 	school    = {'teacher'},
+	outside   = {'charachoal'}, -- plus lumberjacks and miners
 	};
 
 -- TODO: innkeeper - sell drinks, food and beds for restoring health?
@@ -524,3 +551,12 @@ mobf_trader.village_jobs = {
 -- TODO: apple
 -- TODO: gold stuff; mese, diamond
 
+
+-- TODO nicht sinnvoll: schuster, tuchmacher (evtl. wollhaendler?), weber (auch wolle?), schneider (auch wolle?), maler, barbiere, 
+-- TODO sinnvoll: fischer, schlachter, gerber, schaefer, tuermer (eher in stadt/burg), bader?, spielleute
+
+-- TODO: jaeger, waechter
+-- TODO: fahrender haendler
+
+-- TODO: bei den villages auch ab und an nur mal einen wagen hinstellen
+-- TODO: neben wagen auch backhaus, wachturm, fischerhuette/loeschteich, kohlenmeiler
