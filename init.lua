@@ -28,13 +28,9 @@ Features:
 mobf_trader = {}
 
 
-mobf_trader.MAX_TRADER_PER_PLAYER = 2; -- players can only have this many traders
-mobf_trader.MAX_MOBS_PER_PLAYER   = 2; -- ..and this many mobs alltogether
-
-mobf_trader.TRADER_PRICE = 'default:gold_ingot 12';
 
 
-
+dofile(minetest.get_modpath("mobf_trader").."/config.lua");        -- local configuration values
 dofile(minetest.get_modpath("mobf_trader").."/mob_basics.lua");    -- basic functionality: onfig, spawn, ...
 dofile(minetest.get_modpath("mobf_trader").."/mob_pickup.lua");    -- pick trader up/place again
 dofile(minetest.get_modpath("mobf_trader").."/mob_trading.lua");   -- the actual trading code - complete with formspecs

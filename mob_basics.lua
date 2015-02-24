@@ -573,7 +573,6 @@ end
 -- compatibility function for random_buildings
 mobf_trader_spawn_trader = mob_basics.spawn_mob;
 
-mobf_trader = {};
 mobf_trader.spawn_trader = mob_basics.spawn_mob;
 
 
