@@ -212,8 +212,8 @@ end
 mob_basics.get_face_direction = function(v1, v2)
         if v1 and v2 then
                 if v1.x and v2.x and v1.z and v2.z then
-                        dx = v1.x - v2.x
-                        dz = v2.z - v1.z
+                        local dx = v1.x - v2.x
+                        local dz = v2.z - v1.z
                         return math.atan2(dx, dz)
                 end
         end
@@ -236,13 +236,14 @@ end
 mob_basics.random_number_generator_polar = function()
 	local u = 0;
 	local v = 0;
+	local q = 0;
 	repeat
 		u = 2 * math.random() - 1;
 		v = 2 * math.random() - 1;
 		q = u * u + v * v
 	until( (0 < q) and (q < 1));
 
-	p = math.sqrt(-2 * math.log(q) / q) -- math.log returns ln(q)
+	local p = math.sqrt(-2 * math.log(q) / q) -- math.log returns ln(q)
 	return {x1 = u * p, x2 = v * p };
 end
 
@@ -412,7 +413,7 @@ mob_basics.form_input_handler = function( player, formname, fields)
 	end
 
 -- TODO: determine prefix from formname
-	prefix = 'trader';
+	local prefix = 'trader';
 
 	-- all the relevant information is contained in the name of the button that has
 	-- been clicked on: npc-id, selections
