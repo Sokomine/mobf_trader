@@ -51,7 +51,7 @@ mobf_trader.trader_entity_prototype = {
 
 	visual       = "mesh";
 	visual_size  = {x=1, y=1, z=1},
-	mesh         = "character.x",
+	mesh         = "character.b3d", --"character.x",
 	textures     = {"character.png"},
 
 
