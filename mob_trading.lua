@@ -1043,7 +1043,7 @@ mob_trading.can_trade = function( price_stack_str, debtor_name, debtor_inv, rece
 			end
 		end
 		-- with several items as payment, we want a free slot for each payment - else we cannot be sure that the trader can store all of the payment
-		if( free_slots_wanted > 0 and (not(counted_inv[""]) or counted_inv[""]<free_slots_wanted )) then
+		if( free_slots_wanted > 0 and (not(counted_inv) or not(counted_inv[""]) or counted_inv[""]<free_slots_wanted )) then
 			return { error_msg = 'Sorry, I do not have enough free inventory slots to ensure that the trade can take place.',
 				 price_desc = price_desc, price_stacks = price_stacks, price_types = price_types };
 		end
