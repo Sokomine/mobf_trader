@@ -1073,7 +1073,7 @@ mob_trading.can_trade = function( price_stack_str, debtor_name, debtor_inv, rece
 				price_desc = price_desc..', '..res.price_desc;
 			end
 			-- if money/money2 is part of the price, then that will not need a free inventory slot in the trader's chest
-			if( res.price_types and res.price_types[1] ~= 'direct' ) then
+			if( (res.price_types and res.price_types[1] ~= 'direct' ) or (player_is_debtor and not(counted_inv)) ) then
 				free_slots_wanted = free_slots_wanted - 1;
 			end
 		end
