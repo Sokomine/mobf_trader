@@ -67,12 +67,14 @@ mob_trading.show_trader_formspec = function( self, player, menu_path, fields, tr
 	end
 
 	-- which goods does this trader trade?
-	if(     self.trader_typ == 'random' or self.trader_stock ) then
+	if(     self.trader_typ == 'random'
+	     or self.trader_stock
+	    or (mobf_trader.ALL_TRADERS_RANDOM and self.trader_typ ~= 'individual' and trader_goods and #trader_goods>0)) then
 		-- give each trader at least one item for trade
 		if( not( self.trader_stock ) or #self.trader_stock < 1 ) then
-			mobf_trader.trader_with_stock_add_random_offer( self, 1 );
+			mobf_trader.trader_with_stock_add_random_offer( self, 1, trader_goods );
 		end
-		trader_goods = mobf_trader.trader_with_stock_get_goods( self, player );
+		trader_goods = mobf_trader.trader_with_stock_get_goods( self, player, trader_goods );
 	elseif( self.trader_typ == 'individual' or not( trader_goods ) or #trader_goods < 1 ) then
 		trader_goods = self.trader_goods;
 	end
@@ -308,7 +310,7 @@ mob_trading.show_trader_formspec = function( self, player, menu_path, fields, tr
 				if( self.trader_stock and self.trader_stock[ choice1 ]) then
 					self.trader_stock[ choice1 ][2] = self.trader_stock[ choice1 ][2] - 1;
 					-- callback function used to get new stock
-					mobf_trader.trader_with_stock_after_sale( self, player, menu_path, trade_details );					
+					mobf_trader.trader_with_stock_after_sale( self, player, menu_path, trade_details, trader_goods );
 					if( self.trader_stock[ choice1 ][2] < 1 ) then
 						table.remove( self.trader_stock, choice1 );
 						table.remove( self.trader_sold,  choice1 );
@@ -317,7 +319,7 @@ mob_trading.show_trader_formspec = function( self, player, menu_path, fields, tr
 						-- the old selected trade is no longer availabel
 						menu_path = {menu_path[1]};
 						-- update the goods the trader has on offer
-						trader_goods = mobf_trader.trader_with_stock_get_goods( self, player );
+						trader_goods = mobf_trader.trader_with_stock_get_goods( self, player, trader_goods );
 					end
 				-- update the inventory of traders of the type individual as well
 				elseif( self.trader_typ == 'individual' and self.trader_owner) then
