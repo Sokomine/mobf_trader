@@ -67,7 +67,13 @@ mob_trading.show_trader_formspec = function( self, player, menu_path, fields, tr
 	end
 
 	-- which goods does this trader trade?
-	if( self.trader_typ == 'individual' or not( trader_goods ) or #trader_goods < 1 ) then
+	if(     self.trader_typ == 'random' or self.trader_stock ) then
+		-- give each trader at least one item for trade
+		if( not( self.trader_stock ) or #self.trader_stock < 1 ) then
+			mobf_trader.trader_with_stock_add_random_offer( self, 1 );
+		end
+		trader_goods = mobf_trader.trader_with_stock_get_goods( self, player );
+	elseif( self.trader_typ == 'individual' or not( trader_goods ) or #trader_goods < 1 ) then
 		trader_goods = self.trader_goods;
 	end
 	if( not( trader_goods )) then
@@ -270,14 +276,6 @@ mob_trading.show_trader_formspec = function( self, player, menu_path, fields, tr
 		counted_inv = mob_trading.count_trader_inv( self );
 	end
 	
-	-- show the goods the trader has to offer
-	for i,v in ipairs( trader_goods ) do
-
-		formspec = formspec..mob_trading.show_trader_formspec_item_list(
-				((i-1)%8)+1, math.floor((i-1)/8)*1.2+(1.0+m_up), v[1], i, npc_id, 0.4, 0.4, 0.6, counted_inv, true, self);
-	end
-
-
 	-- give information about a specific good
 	if( menu_path and #menu_path >= 2 ) then
 
@@ -294,6 +292,47 @@ mob_trading.show_trader_formspec = function( self, player, menu_path, fields, tr
 		if( offer_packages and #trade_details > 4 ) then
 			offer_packages = false;
 		end
+
+		if( #menu_path >= 3 ) then
+
+			local res = mob_trading.do_trade( self, player, menu_path, trade_details, counted_inv );
+
+			if( res.msg ) then
+				formspec = formspec..
+					'textarea[1.0,5.1;8,1.0;info;;'..( minetest.formspec_escape( res.msg ))..']';
+				minetest.chat_send_player( pname, self.trader_name..': '..res.msg );
+			end
+			local allow_repeat = true;
+			if( res.success ) then
+				-- if the trader is one that has no inv but a limited stock, then substract that stock
+				if( self.trader_stock and self.trader_stock[ choice1 ]) then
+					self.trader_stock[ choice1 ][2] = self.trader_stock[ choice1 ][2] - 1;
+					-- callback function used to get new stock
+					mobf_trader.trader_with_stock_after_sale( self, player, menu_path, trade_details );					
+					if( self.trader_stock[ choice1 ][2] < 1 ) then
+						table.remove( self.trader_stock, choice1 );
+						table.remove( self.trader_sold,  choice1 );
+						-- the trader has no more of that; choice1 points to a diffrent trade offer now
+						allow_repeat = false;
+						-- the old selected trade is no longer availabel
+						menu_path = {menu_path[1]};
+						-- update the goods the trader has on offer
+						trader_goods = mobf_trader.trader_with_stock_get_goods( self, player );
+					end
+				-- update the inventory of traders of the type individual as well
+				elseif( self.trader_typ == 'individual' and self.trader_owner) then
+					counted_inv = mob_trading.count_trader_inv( self );
+				end
+				if( allow_repeat ) then
+					formspec = formspec..
+						'button[1.0,5.8;2.5,0.5;'..menu_path[1]..'_'..menu_path[2]..'_'..menu_path[3]..';Repeat the trade]';
+				end
+			end
+			if( allow_repeat ) then
+				formspec = formspec..'button[1.5,6.3;2,0.5;'..menu_path[1]..'_'..menu_path[2]..';Show prices]';
+			end
+		end	
+
 
 		if( #menu_path >= 2 ) then
 
@@ -323,7 +362,7 @@ mob_trading.show_trader_formspec = function( self, player, menu_path, fields, tr
 			end
 
 			-- the real options here are the prices
-			npc_id   = npc_id..'_'..menu_path[2];
+			local npc_id_det   = npc_id..'_'..menu_path[2];
 
 			local or_or_for = 'for';
 			for i,v in ipairs( trade_details ) do
@@ -341,37 +380,22 @@ mob_trading.show_trader_formspec = function( self, player, menu_path, fields, tr
 						formspec = formspec..
 							'label['..((i-1)*2.40+0.0)..','..(5.1+p_up)..';'..or_or_for..']'..
 							'button['..((i-1)*2.40+0.3)..','..(5.3+p_up)..';1.5,0.5;'..
-							 npc_id..'_'..tostring( i )..';Payment '..tostring(i-1)..']'..
+							 npc_id_det..'_'..tostring( i )..';Payment '..tostring(i-1)..']'..
 
 							mob_trading.show_trader_formspec_item_list(
-								((i-1)*2.40), 4.0+p_up-0.6, trade_details[i], i, npc_id, 1.0, 1.0, 1, counted_inv, false, self )..
+								((i-1)*2.40), 4.0+p_up-0.6, trade_details[i], i, npc_id_det, 1.0, 1.0, 1, counted_inv, false, self )..
 								'box['..(-0.15+((i-1)*2.40))..','..(4.0+p_up-0.70)..';2.1,2.4;'..boxcolor..']';
 					else
 						formspec = formspec..
 							'label['..((i)*1.2-0.3)..','..(4.0+p_up)..';'..or_or_for..']'..
 							'box['..((i*1.2)-0.34)..','..(3.8+p_up)..';1.15,1.10;'..boxcolor..']'..
 							mob_trading.show_trader_formspec_item_list(
-								((i*1.2)-0.5), 4.0+p_up-0.6, trade_details[i], i, npc_id, 1.0, 1.0, 1, counted_inv, false, self );
+								((i*1.2)-0.5), 4.0+p_up-0.6, trade_details[i], i, npc_id_det, 1.0, 1.0, 1, counted_inv, false, self );
 					end
 				end
 			end
 		end
 
-		if( #menu_path >= 3 ) then
-
-			local res = mob_trading.do_trade( self, player, menu_path, trade_details, counted_inv );
-
-			if( res.msg ) then
-				formspec = formspec..
-					'textarea[1.0,5.1;8,1.0;info;;'..( minetest.formspec_escape( res.msg ))..']';
-				minetest.chat_send_player( pname, self.trader_name..': '..res.msg );
-			end
-			if( res.success ) then
-				formspec = formspec..
-					'button[1.0,5.8;2.5,0.5;'..menu_path[1]..'_'..menu_path[2]..'_'..menu_path[3]..';Repeat the trade]';
-			end
-			formspec = formspec..'button[1.5,6.3;2,0.5;'..menu_path[1]..'_'..menu_path[2]..';Show prices]';
-		end	
 		
 		-- show the amount of sold items after the purchase
 		if( menu_path and #menu_path >= 2 ) then
@@ -385,6 +409,15 @@ mob_trading.show_trader_formspec = function( self, player, menu_path, fields, tr
 			end
 		end
 	end
+
+	-- show the goods the trader has to offer
+	for i,v in ipairs( trader_goods ) do
+
+		formspec = formspec..mob_trading.show_trader_formspec_item_list(
+				((i-1)%8)+1, math.floor((i-1)/8)*1.2+(1.0+m_up), v[1], i, npc_id, 0.4, 0.4, 0.6, counted_inv, true, self);
+	end
+
+
 
 	minetest.show_formspec( pname, "mob_trading:trader", formspec );
 end

@@ -34,6 +34,7 @@ dofile(minetest.get_modpath("mobf_trader").."/config.lua");        -- local conf
 dofile(minetest.get_modpath("mobf_trader").."/mob_basics.lua");    -- basic functionality: onfig, spawn, ...
 dofile(minetest.get_modpath("mobf_trader").."/mob_pickup.lua");    -- pick trader up/place again
 dofile(minetest.get_modpath("mobf_trader").."/mob_trading.lua");   -- the actual trading code - complete with formspecs
+dofile(minetest.get_modpath("mobf_trader").."/mob_trading_random.lua");   -- traders with a more random stock
 dofile(minetest.get_modpath("mobf_trader").."/large_chest.lua");   -- one large chest is easier to handle than a collectoin of chests
 --TODO dofile(minetest.get_modpath("mobf_trader").."/mob_sitting.lua");   -- allows the mob to sit/lie on furniture
 
@@ -94,6 +95,8 @@ mobf_trader.trader_entity_prototype = {
 	trader_birthtime = 0,
 	-- additional data (perhaps statistics of how much of what has been sold)
 	trader_sold      = {},
+	-- some traders may have a limited (more random) stock
+	trader_stock     = nil,
 	-- unique ID for each trader
 	trader_id        = '',
 	
@@ -116,6 +119,7 @@ mobf_trader.trader_entity_prototype = {
 				trader_pos       = self.trader_pos,
 		                trader_birthtime = self.trader_birthtime,
 		                trader_sold      = self.trader_sold, 
+		                trader_stock     = self.trader_stock,
 				trader_id        = self.trader_id,
 				trader_texture   = self.trader_texture,
 				trader_goods     = self.trader_goods,
@@ -142,6 +146,7 @@ mobf_trader.trader_entity_prototype = {
 				self.trader_pos       = data.trader_pos;
 		                self.trader_birthtime = data.trader_birthtime;
 		                self.trader_sold      = data.trader_sold; 
+		                self.trader_stock     = data.trader_stock;
 				self.trader_id        = data.trader_id;
 				self.trader_texture   = data.trader_texture;
 				self.trader_goods     = data.trader_goods;
@@ -263,6 +268,7 @@ end
 
 -- this trader can be configured by a player or admin
 mobf_trader.add_trader( nil, 'Trader who is working for someone', 'individual', {}, {'nameless'}, {} );
+mobf_trader.add_trader( nil, 'Trader with limited stock',         'random',     {}, {'nameless'}, {} );
 
 
 
