@@ -50,6 +50,7 @@ mob_trading.tmp_lists = {};
 --      self.trader_goods     required for traders of the typ individual; else determined through self.trader_typ
 --      self.trader_owner     required for traders of the typ individual
 --      self.trader_sold      used for collecting statistics
+--	self.trader_stock     array of {id,amount] values representing the trader's stock
 -- Optional:
 --      self.trader_inv       helper variable that will contain a reference to the trader chest's inventory; will be set automaticly
 --      self.trader_limit     will be used if set; may contain self.trader_limit.sell_if_more[ item name ] and self.trader_limit.buy_if_less[ item name ]
@@ -313,7 +314,6 @@ mob_trading.show_trader_formspec = function( self, player, menu_path, fields, tr
 					mobf_trader.trader_with_stock_after_sale( self, player, menu_path, trade_details, trader_goods );
 					if( self.trader_stock[ choice1 ][2] < 1 ) then
 						table.remove( self.trader_stock, choice1 );
-						table.remove( self.trader_sold,  choice1 );
 						-- the trader has no more of that; choice1 points to a diffrent trade offer now
 						allow_repeat = false;
 						-- the old selected trade is no longer availabel
@@ -408,6 +408,13 @@ mob_trading.show_trader_formspec = function( self, player, menu_path, fields, tr
 					tostring( self.trader_sold[ trade_details[ 1 ]] )..']';
 			else
 				formspec = formspec..'label[9.0,'..(3.9+p_up)..';Sold: -]';
+			end
+
+			if(    self.trader_stock
+			   and self.trader_stock[ choice1 ]
+			   and self.trader_stock[ choice1 ][2] ) then
+				formspec = formspec..'label[9.0,'..(3.7+p_up)..';Stock: '..
+					tostring( math.max( 0, self.trader_stock[ choice1 ][2] ))..']';
 			end
 		end
 	end

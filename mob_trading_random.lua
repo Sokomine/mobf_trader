@@ -28,7 +28,7 @@ mobf_trader.trader_with_stock_add_random_offer = function( self, anz_new_offers,
 		self.trader_stock = {};
 	end
 
-	if( not( trader_goods )) then
+	if( not( trader_goods ) or #trader_goods<1) then
 		trader_goods = mobf_trader.global_trade_offers;
 	end
 
@@ -64,12 +64,12 @@ end
 
 -- return the list of goods represented by self.trader_stock
 mobf_trader.trader_with_stock_get_goods = function( self, player, trader_goods )
-	if( not( trader_goods )) then
-		trader_goods = {};
+	if( not( trader_goods ) or #trader_goods<1) then
+		trader_goods = mobf_trader.global_trade_offers;
 	end
 
 	if( not( self.trader_stock )) then
-		mobf_trader.trader_with_stock_init( self );
+		mobf_trader.trader_with_stock_init( self, trader_goods );
 	end
 	local goods = {};
 	for i,v in ipairs( self.trader_stock ) do

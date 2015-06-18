@@ -106,86 +106,22 @@ mobf_trader.trader_entity_prototype = {
 
 	-- Information that is specific to this particular trader
 	get_staticdata = function(self)
-		-- traders of a standard type do not save their list of goods
-		if( self and self.trader_typ and self.trader_typ ~= 'individual' ) then
-			self.trader_goods = {};
-		end
-		return minetest.serialize( {
-				mob_prefix       = 'trader',
-				trader_name      = self.trader_name,
-				trader_typ       = self.trader_typ,
-		                trader_owner     = self.trader_owner, 
-		                trader_home_pos  = self.trader_home_pos,
-				trader_pos       = self.trader_pos,
-		                trader_birthtime = self.trader_birthtime,
-		                trader_sold      = self.trader_sold, 
-		                trader_stock     = self.trader_stock,
-				trader_id        = self.trader_id,
-				trader_texture   = self.trader_texture,
-				trader_goods     = self.trader_goods,
-				trader_limit     = self.trader_limit,
-				trader_animation = self.trader_animation,
-				trader_vsize     = self.trader_vsize,
-			});
+		return mobf_trader.trader_entity_get_staticdata( self, nil );
 	end,
-
 
 	-- Called when the object is instantiated.
 	on_activate = function(self, staticdata, dtime_s)
-	
-		-- do the opposite of get_staticdata
-		if( staticdata ) then
-			
-			local data = minetest.deserialize( staticdata );
-			if( data and data.trader_id ~= '') then
+		-- set up the trader
+		mobf_trader.trader_entity_on_activate(self, staticdata, dtime_s);
 
-				self.trader_name      = data.trader_name;
-				self.trader_typ       = data.trader_typ;
-		                self.trader_owner     = data.trader_owner; 
-		                self.trader_home_pos  = data.trader_home_pos;
-				self.trader_pos       = data.trader_pos;
-		                self.trader_birthtime = data.trader_birthtime;
-		                self.trader_sold      = data.trader_sold; 
-		                self.trader_stock     = data.trader_stock;
-				self.trader_id        = data.trader_id;
-				self.trader_texture   = data.trader_texture;
-				self.trader_goods     = data.trader_goods;
-				self.trader_animation = data.trader_animation;
-				self.trader_vsize     = data.trader_vsize;
-			end
-
-			if( not( self.trader_animation )) then
-				self.trader_animation = 'stand';
-			end
-	
-			if( self.trader_texture ) then
-				self.object:set_properties( { textures = { self.trader_texture }});
-			end
-
-			if( self.trader_vsize ) then
-				mob_basics.update_visual_size( self, self.trader_vsize, false, 'trader' );
-			end
-		end
-						
 		-- the mob will do nothing but stand around
 		self.object:set_animation({x=self.animation[ self.trader_animation..'_START'], y=self.animation[ self.trader_animation..'_END']},
 				self.animation_speed-5+math.random(10));
-
-		-- initialize a new trader
-		if( not( self.trader_name ) or self.trader_name=='' or self.trader_id=='') then
-			-- no name supplied - it will be choosen automaticly
-			-- the typ of trader is unknown at this stage
-			local typen = mob_basics.type_list_for_prefix('trader');
-			local i     = math.random(1,#typen );
-			-- if trader_id is a duplicate, this entity here (self) will be removed
-			mob_basics.initialize_mob( self, nil, typen[ i ], nil, {x=0,y=0,z=0}, 'trader' );
-		end
 
 		-- the trader has to be subject to gravity
 		self.object:setvelocity(    {x=0, y=  0, z=0});
 		self.object:setacceleration({x=0, y=-10, z=0});
 	end,
-
 
 -- this mob waits for rightclicks and does nothing else
 --[[
@@ -211,29 +147,110 @@ mobf_trader.trader_entity_prototype = {
 		self.object:set_hp( self.hp_max );
 		-- talk to the player
 		if( puncher and puncher:get_player_name() ) then
-			mob_basics.turn_towards_player(  self, puncher );
 			minetest.chat_send_player( puncher:get_player_name(),
 				( self.trader_name or 'A trader' )..': '..
 				'Hey! Stop doing that. I am a peaceful trader. Here, buy something:');
 			-- marketing - if *that* doesn't disencourage aggressive players... :-)
-			mob_trading.show_trader_formspec( self, puncher, nil, nil,
-							  mob_basics.mob_types[ 'trader' ][ self.trader_typ ].goods ); -- this is handled in mob_trading.lua
+			mobf_trader.trader_entity_trade( self, puncher );
 		end
 	end,
 
 
 	-- show the trade menu
 	on_rightclick = function(self, clicker)
-
-		if( not( self) or not( clicker ) or not( self.trader_typ ) or not( mob_basics.mob_types[ 'trader' ][ self.trader_typ ])) then
-			return;
-		end
-
-		mob_basics.turn_towards_player(   self, clicker );
-		mob_trading.show_trader_formspec( self, clicker, nil, nil,
-						  mob_basics.mob_types[ 'trader' ][ self.trader_typ ].goods ); -- this is handled in mob_trading.lua
+		mobf_trader.trader_entity_trade( self, clicker );
 	end,
 }
+
+
+mobf_trader.trader_entity_trade = function( self, clicker )
+	if( not( self) or not( clicker ) or not( self.trader_typ ) or not( mob_basics.mob_types[ 'trader' ][ self.trader_typ ])) then
+		return;
+	end
+
+	mob_basics.turn_towards_player(   self, clicker );
+	mob_trading.show_trader_formspec( self, clicker, nil, nil,
+					  mob_basics.mob_types[ 'trader' ][ self.trader_typ ].goods ); -- this is handled in mob_trading.lua
+end
+
+
+mobf_trader.trader_entity_get_staticdata = function( self, serialized_data )
+
+	local data = {};
+	if( serialized_data ) then
+		data = minetest.deserialize( data );
+	end
+
+	-- traders of a standard type do not save their list of goods
+	if( self and self.trader_typ and self.trader_typ ~= 'individual' ) then
+		self.trader_goods = {};
+	end
+
+	data.mob_prefix       = 'trader';
+	data.trader_name      = self.trader_name;
+	data.trader_typ       = self.trader_typ;
+	data.trader_owner     = self.trader_owner; 
+	data.trader_home_pos  = self.trader_home_pos;
+	data.trader_pos       = self.trader_pos;
+	data.trader_birthtime = self.trader_birthtime;
+	data.trader_sold      = self.trader_sold;
+	data.trader_stock     = self.trader_stock;
+	data.trader_id        = self.trader_id;
+	data.trader_texture   = self.trader_texture;
+	data.trader_goods     = self.trader_goods;
+	data.trader_limit     = self.trader_limit;
+	data.trader_animation = self.trader_animation;
+	data.trader_vsize     = self.trader_vsize;
+
+	return minetest.serialize( data );
+end
+
+
+mobf_trader.trader_entity_on_activate = function(self, staticdata, dtime_s)
+	-- do the opposite of get_staticdata
+	if( staticdata ) then
+		
+		local data = minetest.deserialize( staticdata );
+		if( data and data.trader_id ~= '') then
+
+			self.trader_name      = data.trader_name;
+			self.trader_typ       = data.trader_typ;
+	                self.trader_owner     = data.trader_owner; 
+	                self.trader_home_pos  = data.trader_home_pos;
+			self.trader_pos       = data.trader_pos;
+	                self.trader_birthtime = data.trader_birthtime;
+	                self.trader_sold      = data.trader_sold; 
+	                self.trader_stock     = data.trader_stock;
+			self.trader_id        = data.trader_id;
+			self.trader_texture   = data.trader_texture;
+			self.trader_goods     = data.trader_goods;
+			self.trader_animation = data.trader_animation;
+			self.trader_vsize     = data.trader_vsize;
+		end
+
+		if( not( self.trader_animation )) then
+			self.trader_animation = 'stand';
+		end
+
+		if( self.trader_texture ) then
+			self.object:set_properties( { textures = { self.trader_texture }});
+		end
+
+		if( self.trader_vsize ) then
+			mob_basics.update_visual_size( self, self.trader_vsize, false, 'trader' );
+		end
+	end
+						
+	-- initialize a new trader
+	if( not( self.trader_name ) or self.trader_name=='' or self.trader_id=='') then
+		-- no name supplied - it will be choosen automaticly
+		-- the typ of trader is unknown at this stage
+		local typen = mob_basics.type_list_for_prefix('trader');
+		local i     = math.random(1,#typen );
+		-- if trader_id is a duplicate, this entity here (self) will be removed
+		mob_basics.initialize_mob( self, nil, typen[ i ], nil, {x=0,y=0,z=0}, 'trader' );
+	end
+end
 
 
 minetest.register_entity( "mobf_trader:trader", mobf_trader.trader_entity_prototype);
