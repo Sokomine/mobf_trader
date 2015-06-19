@@ -178,7 +178,7 @@ mobf_trader.trader_entity_get_staticdata = function( self, serialized_data )
 
 	local data = {};
 	if( serialized_data ) then
-		data = minetest.deserialize( data );
+		data = minetest.deserialize( serialized_data );
 	end
 
 	-- traders of a standard type do not save their list of goods
@@ -387,4 +387,31 @@ dofile(minetest.get_modpath("mobf_trader").."/trader_flowers.lua");   -- flowers
 dofile(minetest.get_modpath("mobf_trader").."/trader_ores.lua");      -- sells ores for tree/wood and food (both needed for further mining)
 dofile(minetest.get_modpath("mobf_trader").."/trader_village.lua");   -- historic occupations that can be found in medieval villages
 
+
+mobf_trader.add_as_trader_data = {}
+for i,v in ipairs( mobf_trader.add_as_trader ) do
+	local entity = minetest.registered_entities[ v ];
+	
+	if( entity ) then
+		mobf_trader.add_as_trader_data[ v ] = {
+			get_staticdata = entity.get_staticdata,
+			on_activate    = entity.on_activate,
+			on_rightclick  = entity.on_rightclick,
+		}
+	
+		entity.get_staticdata = function(self)
+			local data = mobf_trader.add_as_trader_data[ v ].get_staticdata( self );
+			return mobf_trader.trader_entity_get_staticdata( self, data );
+		end
+
+		entity.on_activate = function(self, staticdata, dtime_s)
+			mobf_trader.add_as_trader_data[ v ].on_activate( self, staticdata, dtime_s );
+			mobf_trader.trader_entity_on_activate(self, staticdata, dtime_s);
+		end
+
+		entity.on_rightclick = function(self, clicker)
+			mobf_trader.trader_entity_trade( self, clicker );
+		end
+	end
+end
 

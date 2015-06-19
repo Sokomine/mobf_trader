@@ -12,3 +12,6 @@ mobf_trader.RANDOM_STACK_MIN_SIZE = 1;
 mobf_trader.RANDOM_STACK_MAX_SIZE = 10;
 
 mobf_trader.global_trade_offers = {}
+
+mobf_trader.add_as_trader = {"mobs:male1_npc", "mobs:male2_npc", "mobs:male3_npc",
+			"mobs:female1_npc", "mobs:female2_npc", "mobs:female3_npc"}
