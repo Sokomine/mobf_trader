@@ -244,7 +244,7 @@ mob_trading.show_trader_formspec = function( self, player, menu_path, fields, tr
 			greeting3 = tostring( self.trader_owner )..' is my employer.';
 		end
 	else
-		greeting3 = 'I work for myshelf.';
+		greeting3 = 'I work for myself.';
 	end
 
 	if( menu_path and menu_path[1] ) then
