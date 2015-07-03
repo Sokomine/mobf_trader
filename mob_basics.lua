@@ -732,7 +732,7 @@ mob_basics.mob_list_formspec = function( player, formname, fields )
 		input_form_name = 'mob_list_searched';
 	end
 	local formspec = 'size[12,12]'..
-			'button_exit[4.0,1.5;2,0.5;quit;Quit]'..
+			'button_exit[4.0,0.5;2,0.5;quit;Quit]'..
 			'tablecolumns[' ..
 --			'text,align=left;'..
 			'text,align=right;'..
