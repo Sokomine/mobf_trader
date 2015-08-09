@@ -574,7 +574,9 @@ end
 -- compatibility function for random_buildings
 mobf_trader_spawn_trader = mob_basics.spawn_mob;
 
-mobf_trader.spawn_trader = mob_basics.spawn_mob;
+if( minetest.registered_mods( "mobf_trader" ) and mobf_trader ) then
+	mobf_trader.spawn_trader = mob_basics.spawn_mob;
+end
 
 
 -----------------------------------------------------------------------------------------------------
