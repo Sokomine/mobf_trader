@@ -272,7 +272,7 @@ mobf_trader.add_trader = function( prototype, description, speciality, goods, na
 		texture = "character.png";
 	end
 
-	mob_basics.log('Adding trader typ '..speciality, nil, 'trader' );
+--	mob_basics.log('Adding trader typ '..speciality, nil, 'trader' );
 
 
 	mob_basics.mob_types[ 'trader' ][ speciality ] = {
