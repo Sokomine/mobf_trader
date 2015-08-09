@@ -2,7 +2,7 @@
 --[[
 Modified: 20.05.14 Added diffrent trader types for medieval villages.
                    Those traders offer almost all items from default plus cottages.
-                   Items from animals (mobf) and bushes (plantslib) are partly included.
+                   Items from animals (mobf) and bushes (biome_lib) are partly included.
 
 Features:
  * supports up to 16 different trade offers (for more, space might get too tight in the formspec)
