@@ -162,11 +162,11 @@ mob_village_traders.choose_trader_pos = function(pos, minp, maxp, data, param2_d
 	for i,tr in ipairs( traders ) do
 		local tries = 0;
 		local found = false;
-		local pt = {x=pos.x, y=pos.y, z=pos.z};
-		while( tries < 10 and not(found)) do
+		local pt = {x=pos.x, y=pos.y-1, z=pos.z};
+		while( tries < 20 and not(found)) do
 			-- get a random position for the trader
-			pt.x = pos.x+math.random(pos.bsizex);
-			pt.z = pos.z+math.random(pos.bsizez);
+			pt.x = (pos.x-1)+math.random(0,pos.bsizex+1);
+			pt.z = (pos.z-1)+math.random(0,pos.bsizez+1);
 			-- check if it is inside the area contained in data
 			if (pt.x >= minp.x and pt.x <= maxp.x) and (pt.y >= minp.y and pt.y <= maxp.y) and (pt.z >= minp.z and pt.z <= maxp.z) then
 
@@ -176,8 +176,13 @@ mob_village_traders.choose_trader_pos = function(pos, minp, maxp, data, param2_d
 					pt.y = pt.y + 1;
 				end
 
-				-- TODO: check if this position is really suitable? traders standing on the roof are a bit odd
-				found = true;
+				-- check if this position is really suitable? traders standing on the roof are a bit odd
+				local def = minetest.registered_nodes[ minetest.get_name_from_content_id( data[ a:index( pt.x, pt.y-1, pt.z)])];
+				if( not(def) or not(def.drawtype) or def.drawtype=="nodebox" or def.drawtype=="mesh" or def.name=='air') then
+					found = false;
+				elseif( def and def.name ) then
+					found = true;
+				end
 			end
 			tries = tries+1;
 
@@ -188,9 +193,25 @@ mob_village_traders.choose_trader_pos = function(pos, minp, maxp, data, param2_d
 				end
 			end
 		end
-		if( found ) then
-			table.insert( trader_pos, {x=pt.x, y=pt.y, z=pt.z, typ=tr} );
+
+		-- there is usually free space around the building; use that for spawning
+		if( found==false ) then
+			if( pt.x < minp.x ) then
+				pt.x = pos.x + pos.bsizex+1;
+			else
+				pt.x = pos.x-1;
+			end
+			if( pt.z < minp.z ) then
+				pt.z = pos.z + pos.bsizez+1;
+			else
+				pt.z = pos.z-1;
+			end
+			-- let the trader drop down until he finds ground
+			pt.y = pos.y + 20;
+			found = true;
 		end
+
+		table.insert( trader_pos, {x=pt.x, y=pt.y, z=pt.z, typ=tr} );
 	end
 	return trader_pos;
 end
