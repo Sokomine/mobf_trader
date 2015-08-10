@@ -94,4 +94,5 @@ mobf_trader.trader_with_stock_after_sale = function( self, player, menu_path, tr
 	if( #self.trader_stock<1 or math.random(1,#self.trader_stock*2)==1 ) then
 		mobf_trader.trader_with_stock_add_random_offer( self, math.random(1,2), trader_goods );
 	end
+	mob_basics.update_texture( self, "trader", nil );
 end
