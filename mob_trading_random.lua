@@ -75,9 +75,9 @@ mobf_trader.trader_with_stock_get_goods = function( self, player, trader_goods )
 	for i,v in ipairs( self.trader_stock ) do
 		if( trader_goods[ v[1] ] ) then
 			if( trader_goods[ v[1] ].offer ) then
-				goods[i] = trader_goods[ v[1] ].offer;
+				goods[#goods+1] = trader_goods[ v[1] ].offer;
 			else
-				goods[i] = trader_goods[ v[1] ];
+				goods[#goods+1] = trader_goods[ v[1] ];
 			end
 		end
 	end

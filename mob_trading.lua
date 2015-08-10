@@ -57,6 +57,10 @@ mob_trading.get_trader_goods = function( self, trader_goods, player )
 			mobf_trader.trader_with_stock_add_random_offer( self, 2, trader_goods );
 		end
 		trader_goods = mobf_trader.trader_with_stock_get_goods( self, player, trader_goods );
+		if( self.trader_stock and #self.trader_stock > 0 and trader_goods and #trader_goods < 1 ) then
+			self.trader_stock = {};
+			mobf_trader.trader_with_stock_add_random_offer( self, 2, trader_goods );
+		end
 	elseif( self.trader_typ == 'individual' or not( trader_goods ) or #trader_goods < 1 ) then
 		trader_goods = self.trader_goods;
 	end

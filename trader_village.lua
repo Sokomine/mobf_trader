@@ -424,7 +424,7 @@ mobf_trader.add_trader( mobf_trader.npc_trader_prototype,
 	'potterer',
 	{
 		{'default:clay_lump 2',             'default:coal_lump'},
-		{'default:clay 6',                  {'default:shovel_stone'}},
+		{'default:clay 6',                  'default:shovel_stone'},
 		{'cottages:washing',                'default:shovel_steel'}, -- 1 clay
 	},
 	{ 'Peter', 'Paul' },
