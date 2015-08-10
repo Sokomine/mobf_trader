@@ -2,6 +2,9 @@
 -- Trader for villages
 --------------------------------------------
 
+-- general textures shared by the traders in the villages
+mobf_trader.VILLAGE_TRADER_TEXTURES = {'kuhhaendler.png', 'bauer_in_sonntagskleidung.png', 'character.png'};
+
 -- the smith takes twice as much as he'll really need
 mobf_trader.price_smith = function( anz_iron, anz_copper, anz_stick )
 	local price = {};
@@ -56,7 +59,7 @@ mobf_trader.add_trader( mobf_trader.npc_trader_prototype,
 
 	},
 	{ 'Blacky','Simon'},
-	''
+	{'blacksmith.png'}
 	);
 
 
@@ -80,7 +83,7 @@ mobf_trader.add_trader( mobf_trader.npc_trader_prototype,
 
 	},
 	{ 'Charly','Bert'},
-	''
+	{'blacksmith.png'}
 	);
 
 
@@ -137,7 +140,7 @@ mobf_trader.add_trader( mobf_trader.npc_trader_prototype,
 
 	},
 	{ 'Metz'},
-	''
+	mobf_trader.VILLAGE_TRADER_TEXTURES
 	);
 
 
@@ -156,7 +159,7 @@ mobf_trader.add_trader( mobf_trader.npc_trader_prototype,
 		{ 'default:gravel 12',         mobf_trader.price_stonemason( 0, 2, 0 ) }, -- he probably has a grinder from technic at home :-)
 	},
 	{'Stoni'},
-	''
+	mobf_trader.VILLAGE_TRADER_TEXTURES
 	);
 
 
@@ -189,7 +192,7 @@ mobf_trader.add_trader( mobf_trader.npc_trader_prototype,
 		{ 'cottages:gate_closed',      mobf_trader.price_woodworker( 0, 1, 0 ) },
 	},
 	{ 'Friedrich', 'Friedhelm' },
-	''
+	mobf_trader.VILLAGE_TRADER_TEXTURES
 	);
 
 -- this one does wooden tools
@@ -204,7 +207,7 @@ mobf_trader.add_trader( mobf_trader.npc_trader_prototype,
 		{ 'default:sword_wood',        mobf_trader.price_woodworker( 2, 0, 1 ) },
 	},
 	{ 'Ted' },
-	''
+	mobf_trader.VILLAGE_TRADER_TEXTURES
 	);
 
 -- joiner (=Schreiner, Tischler)
@@ -219,7 +222,7 @@ mobf_trader.add_trader( mobf_trader.npc_trader_prototype,
 		{ 'cottages:gate_closed',           mobf_trader.price_woodworker( 2, 0, 0 ) },
 	},
 	{ 'Donald' },
-	''
+	mobf_trader.VILLAGE_TRADER_TEXTURES
 	);
 
 -- this is done by a joiner as well..
@@ -237,7 +240,7 @@ mobf_trader.add_trader( mobf_trader.npc_trader_prototype,
 		{ 'default:sign_wall 4',            mobf_trader.price_woodworker( 6, 0, 1 ) },
 	},
 	{ 'Donald' },
-	''
+	mobf_trader.VILLAGE_TRADER_TEXTURES
 	);
 
 -- a joiner who does ladders and staircases
@@ -254,7 +257,7 @@ mobf_trader.add_trader( mobf_trader.npc_trader_prototype,
 		{ 'default:ladder 3',               mobf_trader.price_woodworker( 0, 0, 7 ) },
 	},
 	{ 'Siegfried' },
-	''
+	mobf_trader.VILLAGE_TRADER_TEXTURES
 	);
 
 
@@ -267,7 +270,7 @@ mobf_trader.add_trader( mobf_trader.npc_trader_prototype,
 		{ 'cottages:tub',                   {'default:wood 5',  'default:steel_ingot 2'}},
 	},
 	{ 'Balduin' },
-	''
+	mobf_trader.VILLAGE_TRADER_TEXTURES
 	);
 
 
@@ -279,7 +282,7 @@ mobf_trader.add_trader( mobf_trader.npc_trader_prototype,
 		{ 'cottages:wagon_wheel',           {'default:wood 4', 'default:stick 20', 'default:steel_ingot 2'}},
 	},
 	{ 'Werner' },
-	''
+	mobf_trader.VILLAGE_TRADER_TEXTURES
 	);
 
 
@@ -298,7 +301,7 @@ mobf_trader.add_trader( mobf_trader.npc_trader_prototype,
 		{ 'animalmaterials:saddle',         {'wool:white 5', 'default:sword_steel'}},
 	},
 	{ 'Sammy' },
-	''
+	mobf_trader.VILLAGE_TRADER_TEXTURES
 	);
 
 
@@ -336,7 +339,7 @@ mobf_trader.add_trader( mobf_trader.npc_trader_prototype,
 		{ 'cottages:roof_flat_slate 6',     mobf_trader.price_woodworker( 2, 0, 0 ) },
 	},
 	{ 'Ronald', 'Robert' },
-	''
+	mobf_trader.VILLAGE_TRADER_TEXTURES
 	);
 
 
@@ -355,7 +358,7 @@ mobf_trader.add_trader( mobf_trader.npc_trader_prototype,
 		{ 'farming:flour 90',               'farming:seed_wheat 99'},
 	},
 	{ 'Martin' },
-	''
+	mobf_trader.VILLAGE_TRADER_TEXTURES
 	);
 
 
@@ -386,7 +389,7 @@ mobf_trader.add_trader( mobf_trader.npc_trader_prototype,
 
 	},
 	{ 'Ben', 'Berthold' },
-	''
+	mobf_trader.VILLAGE_TRADER_TEXTURES
 	);
 
 
@@ -399,7 +402,7 @@ mobf_trader.add_trader( mobf_trader.npc_trader_prototype,
 		{'default:book',                    {'default:papyrus 9', 'default:tree 4'}}, -- for heating the school
 	},
 	{ 'Lars', 'Leon' },
-	''
+	mobf_trader.VILLAGE_TRADER_TEXTURES
 	);
 	
 -- ice trader
@@ -410,7 +413,7 @@ mobf_trader.add_trader( mobf_trader.npc_trader_prototype,
 		{'default:ice',                     'default:pick_steel'},
 	},
 	{ 'Ian', 'Jan' },
-	''
+	mobf_trader.VILLAGE_TRADER_TEXTURES
 	);
 	
 
@@ -425,7 +428,7 @@ mobf_trader.add_trader( mobf_trader.npc_trader_prototype,
 		{'cottages:washing',                'default:shovel_steel'}, -- 1 clay
 	},
 	{ 'Peter', 'Paul' },
-	''
+	mobf_trader.VILLAGE_TRADER_TEXTURES
 	);
 	
 -- a bricklayer
@@ -439,7 +442,7 @@ mobf_trader.add_trader( mobf_trader.npc_trader_prototype,
 		{'stairs:slab_brick 6',             {'default:shovel_stone', 'default:coal_lump 3'}},
 	},
 	{ 'Billy' },
-	''
+	mobf_trader.VILLAGE_TRADER_TEXTURES
 	);
 
 -- someone has to color the wool
@@ -463,7 +466,7 @@ mobf_trader.add_trader( mobf_trader.npc_trader_prototype,
 		{'wool:black 4',                   {'wool:white 4', 'default:coal_lump 3'}},
 	},
 	{ 'Fabian' },
-	''
+	mobf_trader.VILLAGE_TRADER_TEXTURES
 	);
 
 
@@ -487,7 +490,7 @@ mobf_trader.add_trader( mobf_trader.npc_trader_prototype,
 		{'wool:black 24',                  {'wool:white 24', 'default:coal_lump 6', 'cottages:tub'}},
 	},
 	{ 'Friedrich' },
-	''
+	mobf_trader.VILLAGE_TRADER_TEXTURES
 	);
 
 	
@@ -508,7 +511,7 @@ mobf_trader.add_trader( mobf_trader.npc_trader_prototype,
 
 	},
 	{ 'Peter', 'Paul' },
-	''
+	mobf_trader.VILLAGE_TRADER_TEXTURES
 	);
 	
 
@@ -524,7 +527,7 @@ mobf_trader.add_trader( mobf_trader.npc_trader_prototype,
 		{'default:coalblock 9',	        'default:tree 99', 'farming:bread 8'},
 	},
 	{ 'Christian', 'Rauchi' },
-	''
+	mobf_trader.VILLAGE_TRADER_TEXTURES
 	);
 	
 

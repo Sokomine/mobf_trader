@@ -20,7 +20,7 @@ mobf_trader.add_trader( mobf_trader.npc_trader_prototype,
        {"default:leaves 10",          "default:dirt 10",       "default:cobble 10"}
     },
     { "lumberjack" },
-    ""
+    {"holzfaeller.png"}
     );
 
 
@@ -45,7 +45,7 @@ if( minetest.get_modpath("moretrees") ~= nil ) then
        {"moretrees:rubber_tree_trunk 8", "default:cobble 80", "default:steel_ingot 1"},
     },
     { "Woody" },
-    ""
+    {"holzfaeller.png"}
     );
 
 
@@ -86,7 +86,7 @@ if( minetest.get_modpath("moretrees") ~= nil ) then
         v.."_wood",
         goods,
         { "lumberjack" },
-        ""
+        {"holzfaeller.png"}
         );
    end
 end

@@ -260,16 +260,16 @@ minetest.register_entity( "mobf_trader:trader", mobf_trader.trader_entity_protot
 -----------------------------------------------------------------------------------------------------
 -- diffrent types of traders trade diffrent goods, have diffrent name lists etc.
 -----------------------------------------------------------------------------------------------------
-mobf_trader.add_trader = function( prototype, description, speciality, goods, names, texture )
+mobf_trader.add_trader = function( prototype, description, speciality, goods, names, textures )
 
 	-- register traders as such
 	if( not( mob_basics.mob_types[ 'trader' ] )) then
 		mob_basics.mob_types['trader'] = {};
 	end
 
-	-- default texture/skin for the trader
-	if( not(texture) or (texture == "" )) then
-		texture = "character.png";
+	-- default texture/skin for the trader; if multiple are supplied, a random one will be selected
+	if( not(textures) or (textures == "" )) then
+		textures = {"character.png"};
 	end
 
 --	mob_basics.log('Adding trader typ '..speciality, nil, 'trader' );
@@ -280,7 +280,7 @@ mobf_trader.add_trader = function( prototype, description, speciality, goods, na
 		speciality  = speciality,
 		goods       = goods,
 		names       = names,
-		texture     = texture
+		textures    = textures
 	}
 end
 

@@ -495,6 +495,13 @@ mob_basics.initialize_mob = function( self, mob_name, mob_typ, mob_owner, mob_ho
 		self.description = prefix..' '..self[ prefix..'_name'];
 	end
 
+	-- select a random texture for the mob depending on the mob type
+	if( typ_data[ mob_typ ].textures ) then
+		local texture = typ_data[ mob_typ ].textures[ math.random( 1, #typ_data[ mob_typ ].textures )];
+		self[ prefix..'_texture'] = texture;
+		self.object:set_properties( { textures = { texture }});
+	end
+
 	self[ prefix..'_typ']       = mob_typ;      -- the type of the mob
 	self[ prefix..'_owner']     = mob_owner;    -- who spawned this guy?
 	self[ prefix..'_home_pos']  = mob_home_pos; -- position of a control object (build chest, sign?)
@@ -538,9 +545,11 @@ end
 -----------------------------------------------------------------------------------------------------
 -- spawn a mob
 -----------------------------------------------------------------------------------------------------
-mob_basics.spawn_mob = function( pos, mob_typ, player_name, mob_entity_name, prefix, initialize )
+mob_basics.spawn_mob = function( pos, mob_typ, player_name, mob_entity_name, prefix, initialize, no_messages )
 
-	print('Trying to spawn '..tostring( mob_entity_name )..' of type '..tostring( mob_typ )..' at '..minetest.pos_to_string( pos ));
+	if( not( no_messages )) then
+		mob_basics.log('Trying to spawn '..tostring( mob_entity_name )..' of type '..tostring( mob_typ )..' at '..minetest.pos_to_string( pos ));
+	end
 	-- spawning from random_buildings
 	if( not( mob_entity_name ) and not( prefix )) then
 		mob_entity_name = 'mobf_trader:trader';
@@ -562,10 +571,12 @@ mob_basics.spawn_mob = function( pos, mob_typ, player_name, mob_entity_name, pre
 		-- initialize_mob does a mob_basics.update() already
 		if( mob_basics.initialize_mob( self, nil, mob_typ, player_name, pos, prefix )) then
 
-			mob_basics.log( 'Spawned mob', self, prefix );
+			if( not( no_messages )) then
+				mob_basics.log( 'Spawned mob', self, prefix );
+			end
 			self[ prefix..'_texture'] = mob_basics.TEXTURES[ math.random( 1, #mob_basics.TEXTURES )];
 			self.object:set_properties( { textures = { self[ prefix..'_texture'] }});
-		else
+		elseif( not( no_messages )) then
 			mob_basics.log( 'Error: ID already taken. Can not spawn mob.', nil, prefix );
 		end
 	end

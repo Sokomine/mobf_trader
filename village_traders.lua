@@ -39,7 +39,7 @@ mob_village_traders.part_of_village_spawned = function( village, minp, maxp, dat
 
 			-- actually spawn the traders
 			for _,v in ipairs( all_pos ) do
-				mob_basics.spawn_mob( {x=v.x, y=v.y, z=v.z}, v.typ, nil, nil, nil, nil );
+				mob_basics.spawn_mob( {x=v.x, y=v.y, z=v.z}, v.typ, nil, nil, nil, nil, true );
 			end
 
 			-- store the information about the spawned traders
@@ -111,17 +111,17 @@ mob_village_traders.choose_traders = function( village_type, building_type, repl
 			-- RealTest
 			fruit = 'farming:wheat';
 			if( replacements_group['farming'].traders[ 'farming:soy']) then
-				fruit_item = 'farming:soy';
+				fruit = 'farming:soy';
 			end
 			if( minetest.get_modpath("mobf") ) then
 				local animal_trader = {'animal_cow', 'animal_sheep', 'animal_chicken', 'animal_exotic'};
 				res[1] = animal_trader[ math.random( #animal_trader )];	
 			end
-			return { res[1], replacements_group['farming'].traders[ fruit_item ]};
+			return { res[1], replacements_group['farming'].traders[ fruit ]};
 		elseif( #replacements_group['farming'].found > 0 ) then
 			-- get a random fruit to grow
 			fruit = replacements_group['farming'].found[ math.random( #replacements_group['farming'].found) ];
-			return { res[1], replacements_group['farming'].traders[ fruit_item ]};
+			return { res[1], replacements_group['farming'].traders[ fruit ]};
 		else
 			return res;
 		end
@@ -136,11 +136,25 @@ mob_village_traders.choose_traders = function( village_type, building_type, repl
 	-- TODO: banana,cocoa,rubber from farming_plus?
 	-- TODO: sawmill
 	if( building_type == 'lumberjack' or village_type == 'lumberjack' ) then
-		-- TODO: limit this to single houses
-		if( replacements.table and replacements.table[ 'default:wood' ] ) then
-			return { replacements_group['wood'].traders[  replacements.table[ 'default:wood' ]] };
-		elseif( #replacements_group['wood'].traders > 0 ) then
-			return { replacements_group['wood'].traders[ math.random( #replacements_group['wood'].traders) ]};
+		-- find the wood replacement
+		local wood_replacement = 'default:wood';
+		for _,v in ipairs( replacements ) do
+			if( v and v[1]=='default:wood' ) then
+				wood_replacement = v[2];
+			end
+		end
+		-- lumberjacks are more likely to sell the wood of the type of house they are living in
+		if( wood_replacement and math.random(1,3)==1) then
+			return { replacements_group['wood'].traders[ wood_replacement ]};
+		-- ...but not exclusively
+		elseif( replacements_group['wood'].traders ) then
+			-- construct a list containing all available wood trader types
+			local list = {};
+			for k,v in pairs( replacements_group['wood'].traders ) do
+				list[#list+1] = k;
+			end
+			return { replacements_group['wood'].traders[ list[ math.random( 1,#list )]]};
+		-- fallback
 		else
 			return { 'common_wood'};
 		end
@@ -201,11 +215,7 @@ mob_village_traders.choose_trader_pos = function(pos, minp, maxp, data, param2_d
 			else
 				pt.x = pos.x-1;
 			end
-			if( pt.z < minp.z ) then
-				pt.z = pos.z + pos.bsizez+1;
-			else
-				pt.z = pos.z-1;
-			end
+			pt.z = pos.z-1 + math.random( pos.bsizez+1 );
 			-- let the trader drop down until he finds ground
 			pt.y = pos.y + 20;
 			found = true;
