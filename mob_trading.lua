@@ -36,6 +36,32 @@ mob_trading.tmp_lists = {};
 
 
 
+mob_trading.get_trader_goods = function( self, trader_goods, player )
+	if( not( self )) then
+		return {};
+	end
+
+	if(not( trader_goods )
+	   and self
+	   and self.trader_typ
+	   and mob_basics.mob_types[ 'trader' ][ self.trader_typ ] ) then
+		trader_goods = mob_basics.mob_types[ 'trader' ][ self.trader_typ ].goods;
+	end
+
+	-- which goods does this trader trade?
+	if(     self.trader_typ == 'random'
+	     or self.trader_stock
+	    or (mobf_trader.ALL_TRADERS_RANDOM and self.trader_typ ~= 'individual' and trader_goods and #trader_goods>0)) then
+		-- give each trader at least one item for trade
+		if( not( self.trader_stock ) or #self.trader_stock < 1 ) then
+			mobf_trader.trader_with_stock_add_random_offer( self, 2, trader_goods );
+		end
+		trader_goods = mobf_trader.trader_with_stock_get_goods( self, player, trader_goods );
+	elseif( self.trader_typ == 'individual' or not( trader_goods ) or #trader_goods < 1 ) then
+		trader_goods = self.trader_goods;
+	end
+	return trader_goods;
+end
 -------------------------------------------------------------------------------
 -- main formspec of the trader
 -------------------------------------------------------------------------------
@@ -67,20 +93,10 @@ mob_trading.show_trader_formspec = function( self, player, menu_path, fields, tr
 		return;
 	end
 
-	-- which goods does this trader trade?
-	if(     self.trader_typ == 'random'
-	     or self.trader_stock
-	    or (mobf_trader.ALL_TRADERS_RANDOM and self.trader_typ ~= 'individual' and trader_goods and #trader_goods>0)) then
-		-- give each trader at least one item for trade
-		if( not( self.trader_stock ) or #self.trader_stock < 1 ) then
-			mobf_trader.trader_with_stock_add_random_offer( self, 1, trader_goods );
-		end
-		trader_goods = mobf_trader.trader_with_stock_get_goods( self, player, trader_goods );
-	elseif( self.trader_typ == 'individual' or not( trader_goods ) or #trader_goods < 1 ) then
-		trader_goods = self.trader_goods;
-	end
-	if( not( trader_goods )) then
-		trader_goods = {};
+	trader_goods = mob_trading.get_trader_goods( self, trader_goods, player );
+	-- update what the trader wields/shows
+	if( mobf_trader.mesh == "3d_armor_character.b3d" and trader_goods[1]) then
+		mob_basics.update_texture( self, "trader", trader_goods );
 	end
 
 	local formspec = 'size[10,11]'..

@@ -40,9 +40,21 @@ dofile(minetest.get_modpath("mobf_trader").."/village_traders.lua");   -- functi
 --TODO dofile(minetest.get_modpath("mobf_trader").."/mob_sitting.lua");   -- allows the mob to sit/lie on furniture
 
 
-
-
-
+-- find out the right mesh; if the wrong one is used, the traders become invisible
+mobf_trader.mesh = "character.b3d";
+--[[
+-- if we are dealing with realtest - that still uses the old model
+if(    minetest.get_modpath( 'trees' )
+   and minetest.get_modpath( 'anvil')
+   and minetest.get_modpath( 'joiner_table')
+   and minetest.get_modpath( 'scribing_table' )) then
+	mobf_trader.mesh = "character.x";
+end
+--]]
+-- 3darmor/wieldview is great
+if( minetest.get_modpath( '3d_armor' )) then
+	mobf_trader.mesh = "3d_armor_character.b3d";
+end
 
 
 mobf_trader.trader_entity_prototype = {
@@ -53,7 +65,7 @@ mobf_trader.trader_entity_prototype = {
 
 	visual       = "mesh";
 	visual_size  = {x=1, y=1, z=1},
-	mesh         = "character.b3d", --"character.x",
+	mesh         = mobf_trader.mesh,
 	textures     = {"character.png"},
 
 
@@ -234,7 +246,7 @@ mobf_trader.trader_entity_on_activate = function(self, staticdata, dtime_s)
 		end
 
 		if( self.trader_texture ) then
-			self.object:set_properties( { textures = { self.trader_texture }});
+			mob_basics.update_texture( self, 'trader', nil );
 		end
 
 		if( self.trader_vsize ) then
@@ -415,4 +427,3 @@ for i,v in ipairs( mobf_trader.add_as_trader ) do
 		end
 	end
 end
-

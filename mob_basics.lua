@@ -289,7 +289,7 @@ mob_basics.config_mob = function( self, player, menu_path, prefix, formname, fie
 		-- actually set the new texture
 		if( nr and nr > 0 and nr <= #mob_basics.TEXTURES ) then
 			self[ prefix..'_texture'] = mob_basics.TEXTURES[ nr ];
-			self.object:set_properties( { textures = { self[ prefix..'_texture'] }});
+			mob_basics.update_texture( self, prefix, nil );
 		end
 		mob_changed = true;
 
@@ -495,12 +495,6 @@ mob_basics.initialize_mob = function( self, mob_name, mob_typ, mob_owner, mob_ho
 		self.description = prefix..' '..self[ prefix..'_name'];
 	end
 
-	-- select a random texture for the mob depending on the mob type
-	if( typ_data[ mob_typ ].textures ) then
-		local texture = typ_data[ mob_typ ].textures[ math.random( 1, #typ_data[ mob_typ ].textures )];
-		self[ prefix..'_texture'] = texture;
-		self.object:set_properties( { textures = { texture }});
-	end
 
 	self[ prefix..'_typ']       = mob_typ;      -- the type of the mob
 	self[ prefix..'_owner']     = mob_owner;    -- who spawned this guy?
@@ -509,6 +503,12 @@ mob_basics.initialize_mob = function( self, mob_name, mob_typ, mob_owner, mob_ho
 	self[ prefix..'_birthtime'] = os.time();       -- when was the npc first called into existence?
 	self[ prefix..'_sold']      = {};              -- the trader is new and had no time to sell anything yet (only makes sense for traders)
 
+	-- select a random texture for the mob depending on the mob type
+	if( typ_data[ mob_typ ].textures ) then
+		local texture = typ_data[ mob_typ ].textures[ math.random( 1, #typ_data[ mob_typ ].textures )];
+		self[ prefix..'_texture'] = texture;
+		mob_basics.update_texture( self, prefix, nil );
+	end
 	mob_basics.update_visual_size( self, nil, true, prefix ); -- generate random visual size
 
 	-- create unique ID for the mob
@@ -820,6 +820,70 @@ mob_basics.mob_list_formspec = function( player, formname, fields )
         -- display the formspec
         minetest.show_formspec( pname, "mob_basics:mob_list", formspec );
 end
+
+-----------------------------------------------------------------------------------------------------
+-- traders may have diffrent textures; if 3d_armor is installed, they show what they sell
+-----------------------------------------------------------------------------------------------------
+-- TODO: add an option for mobs to statically wield something
+mob_basics.update_texture = function( self, prefix, trader_goods )
+
+	-- set a default fallback texture
+	if( not( self[ prefix..'_texture'] )) then
+		self[ prefix..'_texture'] = "character.png";
+	end
+	-- normal model
+	if( mobf_trader.mesh ~= "3d_armor_character.b3d" ) then
+		self.object:set_properties( { textures = { self[ prefix..'_texture'] }});
+		-- we are done; no way to show the player what the mob is trying to sell
+		return;
+	end
+
+	-- we are dealing with wieldview now
+
+	-- fallback in case we find no image for the trade good
+	local wield_texture = "3d_armor_trans.png";
+
+	-- get the goods the trader has to offer
+	if( not( trader_goods )) then
+	 	trader_goods = mob_trading.get_trader_goods( self, nil, nil);
+	end
+	if( not( trader_goods )) then
+		trader_goods = {};
+	end
+
+	local wield_offer = trader_goods[1];
+	if( type(trader_goods[1])== 'table' ) then
+		wield_offer = trader_goods[1][1];
+	end
+	-- update what the trader wields
+	if(    wield_offer
+	   and trader_goods
+	   and type(wield_offer)=='string' ) then
+		
+		local stack = ItemStack( wield_offer );
+		local stack_name = stack:get_name();
+		if( stack_name and minetest.registered_items[ stack_name ] ) then
+			wield_texture = minetest.registered_items[ stack_name ].wield_image;
+			if( not( wield_texture ) or wield_texture=="") then
+				wield_texture = minetest.registered_items[ stack_name ].inventory_image;
+			end
+			if( not( wield_texture ) or wield_texture=="") then
+				wield_texture = minetest.registered_items[ stack_name ].tiles;
+				if( type(wield_texture)=='table' ) then
+					wield_texture = wield_texture[1];
+				end
+			end
+		end
+	end
+
+	-- actually update the textures
+	self.object:set_properties( { textures = { 
+		self[ prefix..'_texture'],
+		"3d_armor_trans.png",
+		wield_texture
+	}});
+end
+
 
 -- TODO: show additional data
 --                                trader_home_pos  = self.trader_home_pos,
