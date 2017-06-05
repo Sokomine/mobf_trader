@@ -1,6 +1,130 @@
 
 mob_village_traders = {}
 
+mob_village_traders.names_male = { "John", "James", "Charles", "Robert", "Joseph",
+	"Richard", "David", "Michael", "Christopher", "Jason", "Matthew",
+	"Joshua", "Daniel","Andrew", "Tyler", "Jakob", "Nicholas", "Ethan",
+	"Alexander", "Jayden", "Mason", "Liam", "Oliver", "Jack", "Harry",
+	"George", "Charlie", "Jacob", "Thomas", "Noah", "Wiliam", "Oscar",
+	"Clement", "August", "Peter", "Edgar", "Calvin", "Francis", "Frank",
+	"Eli", "Adam", "Samuel", "Bartholomew", "Edward", "Roger", "Albert",
+	"Carl", "Alfred", "Emmett", "Eric", "Henry", "Casimir", "Alan",
+	"Brian", "Logan", "Stephen", "Alexander", "Gregory", "Timothy",
+	"Theodore", "Marcus", "Justin", "Julius", "Felix", "Pascal", "Jim",
+	"Ben", "Zach", "Tom" };
+
+mob_village_traders.names_female = { "Amelia", "Isla", "Ella", "Poppy", "Mia", "Mary",
+	"Anna", "Emma", "Elizabeth", "Minnie", "Margret", "Ruth", "Helen",
+	"Dorothy", "Betty", "Barbara", "Joan", "Shirley", "Patricia", "Judith",
+	"Carol", "Linda", "Sandra", "Susan", "Deborah", "Debra", "Karen", "Donna",
+	"Lisa", "Kimberly", "Michelle", "Jennifer", "Melissa", "Amy", "Heather",
+	"Angela", "Jessica", "Amanda", "Sarah", "Ashley", "Brittany", "Samatha",
+	"Emily", "Hannah", "Alexis", "Madison", "Olivia", "Abigail", "Isabella",
+	"Ava", "Sophia", "Martha", "Rosalind", "Matilda", "Birgid", "Jennifer",
+	"Chloe", "Katherine", "Penelope", "Laura", "Victoria", "Cecila", "Julia",
+	"Rose", "Violet", "Jasmine", "Beth", "Stephanie", "Jane", "Jacqueline",
+	"Josephine", "Danielle", "Paula", "Pauline", "Patricia", "Francesca"}
+
+-- get a middle name for the mob
+mob_village_traders.get_random_letter = function()
+	return string.char( string.byte( "A") + math.random( string.byte("Z") - string.byte( "A")));
+end
+
+-- this is for medieval villages
+mob_village_traders.get_family_function_str = function( data )
+	if(     data.generation == 2 and data.gender=="m") then
+		return "worker";
+	elseif( data.generation == 2 and data.gender=="f") then
+		return "wife";
+	elseif( data.generation == 3 and data.gender=="m") then
+		return "grandfather";
+	elseif( data.generation == 3 and data.gender=="f") then
+		return "grandmother";
+	elseif( data.generation == 1 and data.gender=="m") then
+		return "son";
+	elseif( data.generation == 1 and data.gender=="f") then
+		return "daughter";
+	else
+		return "unkown";
+	end
+end
+
+mob_village_traders.get_full_trader_name = function( data )
+	if( not( data ) or not( data.first_name )) then
+		return;
+	end
+	local str = data.first_name;
+	if( data.middle_name ) then
+		str = str.." "..data.middle_name..".";
+	end
+	if( data.last_name ) then
+		str = str.." "..data.last_name;
+	end
+	if( data.age ) then
+		str = str..", age "..data.age;
+	end
+	-- TODO: if there is a job:   , blacksmith Fred's son   etc.
+	if( data.generation and data.gender ) then
+		str = str.." ("..mob_village_traders.get_family_function_str( data )..")";
+	end
+	return str;
+end
+
+-- TODO: store immediately where profession is determined by house type
+-- TODO: shed12 and cow_shed are rather for annimals than working sheds
+-- TODO: pastures are for annimals
+
+-- TODO: in particular: there can only be one mob with the same first name and the same profession per village
+-- configure a new inhabitant
+-- 	gender	can be "m" or "f"
+--	generation	2 for parent-generation, 1 for children, 3 for grandparents
+--	name_exlcude	names the npc is not allowed to carry (=avoid duplicates)
+--			(not a list but a hash table)
+mob_village_traders.get_new_inhabitant = function( data, gender, generation, name_exclude )
+	-- only create a new inhabitant if this one has not yet been configured
+	if( not( data ) or data.first_name ) then
+		return data;
+	end
+
+	-- the gender of children is random
+	if( gender=="r" ) then
+		if( math.random(2)==1 ) then
+			gender = "m";
+		else
+			gender = "f";
+		end
+	end
+
+	local name_list = {};
+	if( gender=="f") then
+		name_list = mob_village_traders.names_female;
+		data.gender     = "f";   -- female
+	else -- if( gender=="m" ) then
+		name_list = mob_village_traders.names_male;
+		data.gender     = "m";   -- male
+	end
+	local name_list_tmp = {};
+	for i,v in ipairs( name_list ) do
+		if( not( name_exclude[ v ])) then
+			table.insert( name_list_tmp, v );
+		end
+	end
+	data.first_name = name_list_tmp[ math.random(#name_list_tmp)];
+	-- middle name as used in the english speaking world (might help to distinguish mobs with the same first name)
+	data.middle_name = mob_village_traders.get_random_letter();
+
+	data.generation = generation; -- 2: parent generation; 1: child; 3: grandparents
+	if(     data.generation == 1 ) then
+		data.age =      math.random( 18 ); -- a child
+	elseif( data.generation == 2 ) then
+		data.age = 18 + math.random( 30 ); -- a parent
+	elseif( data.generation == 3 ) then
+		data.age = 48 + math.random( 50 ); -- a grandparent
+	end
+	return data;
+end
+
+
 -- spawn traders in villages
 mob_village_traders.part_of_village_spawned = function( village, minp, maxp, data, param2_data, a, cid )
 	-- if mobf_trader is not installed, we can't spawn any mobs;
@@ -22,14 +146,88 @@ mob_village_traders.part_of_village_spawned = function( village, minp, maxp, dat
 
 		-- only handle buildings that are at least partly contained in that part of the
 		-- village that got spawned in this mapchunk
+		-- if further parts of the house spawn in diffrent mapchunks, the new beds will be
+		-- checked and populated with further inhabitants
 		if( not(  bpos.x > maxp.x or bpos.x + bpos.bsizex < minp.x
 		       or bpos.z > maxp.z or bpos.z + bpos.bsizez < minp.z ) 
 		   -- the building type determines which kind of traders will live there
 		   and building_data
 		   and building_data.typ 
+		   -- are there beds where the mob can sleep?
+		   and bpos.beds and table.getn( bpos.beds ) > 0 ) then
+
+			-- lumberjack home
+			if( building_data.typ == "lumberjack" ) then
+
+				for i,v in ipairs( bpos.beds ) do
+					-- lumberjacks do not have families and are all male
+					v = mob_village_traders.get_new_inhabitant( v, "m", 2, {} );
+				end
+
+			-- normal house containing a family
+			else
+				-- the first inhabitant will be the male worker
+				if( not( bpos.beds[1].first_name )) then
+					bpos.beds[1] = mob_village_traders.get_new_inhabitant( bpos.beds[1], "m", 2, {} ); -- male of parent generation
+				end
+
+				local name_exclude = {};
+				-- the second inhabitant will be the wife of the male worker
+				if( bpos.beds[2] and not( bpos.beds[2].first_name )) then
+					bpos.beds[2] = mob_village_traders.get_new_inhabitant( bpos.beds[2], "f", 2, {} ); -- female of parent generation
+					-- first names ought to be uniq withhin a family
+					name_exclude[ bpos.beds[2].first_name ] = 1;
+				end
+
+				-- not all houses will have grandparents
+				local grandmother_bed_id = 2+math.random(5);
+				local grandfather_bed_id = 2+math.random(5);
+				-- a child of 18 with a parent of 19 would be...usually impossible unless adopted
+				local oldest_child = 0;
+
+				-- the third and subsequent inhabitants will ether be children or grandparents
+				for i,v in ipairs( bpos.beds ) do
+					-- at max 7 npc per house (taverns may have more beds than that)
+					if( v and not( v.first_name ) and i<8) then
+						if(     i==grandmother_bed_id ) then
+							v = mob_village_traders.get_new_inhabitant( v, "f", 3, name_exclude ); -- get the grandmother
+						elseif( i==grandfather_bed_id ) then
+							v = mob_village_traders.get_new_inhabitant( v, "m", 3, name_exclude ); -- get the grandfather
+						else
+							v = mob_village_traders.get_new_inhabitant( v, "r", 1, name_exclude ); -- get a child of random gender
+							-- find out how old the oldest child is
+							if( v.age > oldest_child ) then
+								oldest_child = v.age;
+							end
+						end
+						-- children and grandparents need uniq names withhin a family
+						name_exclude[ v.first_name ] = 1;
+					end
+				end
+				-- the father has to be old enough for his children
+				if( bpos.beds[1] and oldest_child + 18 > bpos.beds[1].age ) then
+					bpos.beds[1].age = oldest_child + 18 + math.random( 10 );
+				end
+				-- the mother also has to be old enough as well
+				if( bpos.beds[2] and oldest_child + 18 > bpos.beds[2].age ) then
+					bpos.beds[2].age = oldest_child + 18 + math.random( 10 );
+				end
+			end
+
+
+			local str = "HOUSE "..tostring( building_data.typ ).." is inhabitated by:\n";
+			for i,v in ipairs( bpos.beds ) do
+				if( v and v.first_name ) then
+					str = str.." "..mob_village_traders.get_full_trader_name( v ).."\n";
+				end
+			end
+			print( str );
+
+--[[
 		   -- avoid spawning them twice
 		   and not( bpos.traders )) then
 
+print("ASSIGNING TO "..tostring(building_data.typ).." WITH beds "..minetest.serialize( bpos.beds ));
 			-- choose traders; the replacements may be relevant:
 			-- wood traders tend to sell the same wood type of which their house is built
 			local traders = mob_village_traders.choose_traders( village_type, building_data.typ, village.to_add_data.replacements );
@@ -44,6 +242,7 @@ mob_village_traders.part_of_village_spawned = function( village, minp, maxp, dat
 
 			-- store the information about the spawned traders
 			village.to_add_data.bpos[ i ].traders = all_pos;
+--]]
 		end
 	end
 end
@@ -63,17 +262,20 @@ mob_village_traders.choose_traders = function( village_type, building_type, repl
 	elseif( building_type == 'school' ) then
 		return { 'teacher' };
 	elseif( building_type == 'forge' ) then
-		local traders = {'blacksmith', 'bronzesmith' };
+		local traders = {'blacksmith', 'bronzesmith',
+			'goldsmith', 'bladesmith', 'locksmith', 'coppersmith', 'silversmith', 'tinsmith' }; -- TODO: does not exist yet
 		return { traders[ math.random(#traders)] };
 	elseif( building_type == 'shop' ) then
 		local traders = {'seeds','flowers','misc','default','ore', 'fruit trader', 'wood'};
 		return { traders[ math.random(#traders)] };
-	-- there are no traders for these jobs - they'd require specialized mobs
-	elseif( building_type == 'tower'
-	     or building_type == 'church'
-	     or building_type == 'secular'
-	     or building_type == 'tavern' ) then
-		return {};
+	elseif( building_type == 'church' ) then
+		return { 'priest' }; -- TODO: does not exist yet
+	elseif( building_type == 'tower' ) then
+		return { 'guard' }; -- TODO: does not exist yet  -- TODO: really only one guard per village?
+	elseif( building_type == 'library' ) then
+		return { 'librarian' }; -- TODO: does not exist yet
+	elseif( building_type == 'tavern' ) then
+		return { 'barkeeper'}; -- TODO: does not exist yet
 	end
 
 	if(     village_type == 'charachoal' ) then
@@ -83,7 +285,7 @@ mob_village_traders.choose_traders = function( village_type, building_type, repl
 	end
 
 	local res = {};
-	if(   building_type == 'shed'
+	if(   building_type == 'shed' -- TODO: workers from the houses may work here
 	   or building_type == 'farm_tiny' 
 	   or building_type == 'house'
 	   or building_type == 'house_large'
@@ -158,10 +360,13 @@ mob_village_traders.choose_traders = function( village_type, building_type, repl
 		else
 			return { 'common_wood'};
 		end
+
+	-- TODO: trader, pit (in claytrader villages)
 	end
 
 	
 	-- tent, chateau: places for living at; no special jobs associated
+	-- TODO: chateau: may have a servant
 	-- nore,taoki,medieval,lumberjack,logcabin,canadian,grasshut,tent: further village types
 
 	return res;
