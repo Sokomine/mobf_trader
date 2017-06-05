@@ -125,6 +125,94 @@ mob_village_traders.get_new_inhabitant = function( data, gender, generation, nam
 end
 
 
+-- assign inhabitants to bed positions; create families;
+-- bpos needs to contain at least { beds = {list_of_bed_positions}, btye = building_type}
+mob_village_traders.assing_mobs_to_beds = function( bpos )
+
+	if( not( bpos ) or not( bpos.btype )) then
+		return bpos;
+	end
+
+	-- get data about the building
+	local building_data = mg_villages.BUILDINGS[ bpos.btype ];
+	-- the building type determines which kind of traders will live there
+	if( not( building_data ) or not( building_data.typ )
+	   -- are there beds where the mob can sleep?
+	   or not( bpos.beds ) or table.getn( bpos.beds ) < 1) then
+		return bpos;
+	end
+
+	-- lumberjack home
+	if( building_data.typ == "lumberjack" ) then
+
+		for i,v in ipairs( bpos.beds ) do
+			-- lumberjacks do not have families and are all male
+			v = mob_village_traders.get_new_inhabitant( v, "m", 2, {} );
+		end
+
+	-- normal house containing a family
+	else
+		-- the first inhabitant will be the male worker
+		if( not( bpos.beds[1].first_name )) then
+			bpos.beds[1] = mob_village_traders.get_new_inhabitant( bpos.beds[1], "m", 2, {} ); -- male of parent generation
+		end
+
+		local name_exclude = {};
+		-- the second inhabitant will be the wife of the male worker
+		if( bpos.beds[2] and not( bpos.beds[2].first_name )) then
+			bpos.beds[2] = mob_village_traders.get_new_inhabitant( bpos.beds[2], "f", 2, {} ); -- female of parent generation
+			-- first names ought to be uniq withhin a family
+			name_exclude[ bpos.beds[2].first_name ] = 1;
+		end
+
+		-- not all houses will have grandparents
+		local grandmother_bed_id = 2+math.random(5);
+		local grandfather_bed_id = 2+math.random(5);
+		-- a child of 18 with a parent of 19 would be...usually impossible unless adopted
+		local oldest_child = 0;
+
+		-- the third and subsequent inhabitants will ether be children or grandparents
+		for i,v in ipairs( bpos.beds ) do
+			-- at max 7 npc per house (taverns may have more beds than that)
+			if( v and not( v.first_name ) and i<8) then
+				if(     i==grandmother_bed_id ) then
+					v = mob_village_traders.get_new_inhabitant( v, "f", 3, name_exclude ); -- get the grandmother
+				elseif( i==grandfather_bed_id ) then
+					v = mob_village_traders.get_new_inhabitant( v, "m", 3, name_exclude ); -- get the grandfather
+				else
+					v = mob_village_traders.get_new_inhabitant( v, "r", 1, name_exclude ); -- get a child of random gender
+					-- find out how old the oldest child is
+					if( v.age > oldest_child ) then
+						oldest_child = v.age;
+					end
+				end
+				-- children and grandparents need uniq names withhin a family
+				name_exclude[ v.first_name ] = 1;
+			end
+		end
+		-- the father has to be old enough for his children
+		if( bpos.beds[1] and oldest_child + 18 > bpos.beds[1].age ) then
+			bpos.beds[1].age = oldest_child + 18 + math.random( 10 );
+		end
+		-- the mother also has to be old enough as well
+		if( bpos.beds[2] and oldest_child + 18 > bpos.beds[2].age ) then
+			bpos.beds[2].age = oldest_child + 18 + math.random( 10 );
+		end
+	end
+
+	-- TODO: only for debugging
+	local str = "HOUSE "..tostring( building_data.typ ).." is inhabitated by:\n";
+	for i,v in ipairs( bpos.beds ) do
+		if( v and v.first_name ) then
+			str = str.." "..mob_village_traders.get_full_trader_name( v ).."\n";
+		end
+	end
+	print( str );
+
+	return bpos;
+end
+
+
 -- spawn traders in villages
 mob_village_traders.part_of_village_spawned = function( village, minp, maxp, data, param2_data, a, cid )
 	-- if mobf_trader is not installed, we can't spawn any mobs;
@@ -141,88 +229,16 @@ mob_village_traders.part_of_village_spawned = function( village, minp, maxp, dat
 
 	-- for each building in the village
 	for i,bpos in pairs(village.to_add_data.bpos) do
-		-- get data about the building
-		local building_data = mg_villages.BUILDINGS[ bpos.btype ];
 
 		-- only handle buildings that are at least partly contained in that part of the
 		-- village that got spawned in this mapchunk
 		-- if further parts of the house spawn in diffrent mapchunks, the new beds will be
 		-- checked and populated with further inhabitants
 		if( not(  bpos.x > maxp.x or bpos.x + bpos.bsizex < minp.x
-		       or bpos.z > maxp.z or bpos.z + bpos.bsizez < minp.z ) 
-		   -- the building type determines which kind of traders will live there
-		   and building_data
-		   and building_data.typ 
-		   -- are there beds where the mob can sleep?
-		   and bpos.beds and table.getn( bpos.beds ) > 0 ) then
+		       or bpos.z > maxp.z or bpos.z + bpos.bsizez < minp.z )) then
 
-			-- lumberjack home
-			if( building_data.typ == "lumberjack" ) then
-
-				for i,v in ipairs( bpos.beds ) do
-					-- lumberjacks do not have families and are all male
-					v = mob_village_traders.get_new_inhabitant( v, "m", 2, {} );
-				end
-
-			-- normal house containing a family
-			else
-				-- the first inhabitant will be the male worker
-				if( not( bpos.beds[1].first_name )) then
-					bpos.beds[1] = mob_village_traders.get_new_inhabitant( bpos.beds[1], "m", 2, {} ); -- male of parent generation
-				end
-
-				local name_exclude = {};
-				-- the second inhabitant will be the wife of the male worker
-				if( bpos.beds[2] and not( bpos.beds[2].first_name )) then
-					bpos.beds[2] = mob_village_traders.get_new_inhabitant( bpos.beds[2], "f", 2, {} ); -- female of parent generation
-					-- first names ought to be uniq withhin a family
-					name_exclude[ bpos.beds[2].first_name ] = 1;
-				end
-
-				-- not all houses will have grandparents
-				local grandmother_bed_id = 2+math.random(5);
-				local grandfather_bed_id = 2+math.random(5);
-				-- a child of 18 with a parent of 19 would be...usually impossible unless adopted
-				local oldest_child = 0;
-
-				-- the third and subsequent inhabitants will ether be children or grandparents
-				for i,v in ipairs( bpos.beds ) do
-					-- at max 7 npc per house (taverns may have more beds than that)
-					if( v and not( v.first_name ) and i<8) then
-						if(     i==grandmother_bed_id ) then
-							v = mob_village_traders.get_new_inhabitant( v, "f", 3, name_exclude ); -- get the grandmother
-						elseif( i==grandfather_bed_id ) then
-							v = mob_village_traders.get_new_inhabitant( v, "m", 3, name_exclude ); -- get the grandfather
-						else
-							v = mob_village_traders.get_new_inhabitant( v, "r", 1, name_exclude ); -- get a child of random gender
-							-- find out how old the oldest child is
-							if( v.age > oldest_child ) then
-								oldest_child = v.age;
-							end
-						end
-						-- children and grandparents need uniq names withhin a family
-						name_exclude[ v.first_name ] = 1;
-					end
-				end
-				-- the father has to be old enough for his children
-				if( bpos.beds[1] and oldest_child + 18 > bpos.beds[1].age ) then
-					bpos.beds[1].age = oldest_child + 18 + math.random( 10 );
-				end
-				-- the mother also has to be old enough as well
-				if( bpos.beds[2] and oldest_child + 18 > bpos.beds[2].age ) then
-					bpos.beds[2].age = oldest_child + 18 + math.random( 10 );
-				end
-			end
-
-
-			local str = "HOUSE "..tostring( building_data.typ ).." is inhabitated by:\n";
-			for i,v in ipairs( bpos.beds ) do
-				if( v and v.first_name ) then
-					str = str.." "..mob_village_traders.get_full_trader_name( v ).."\n";
-				end
-			end
-			print( str );
-
+			bpos = mob_village_traders.assing_mobs_to_beds( bpos );
+		end
 --[[
 		   -- avoid spawning them twice
 		   and not( bpos.traders )) then
@@ -243,7 +259,6 @@ print("ASSIGNING TO "..tostring(building_data.typ).." WITH beds "..minetest.seri
 			-- store the information about the spawned traders
 			village.to_add_data.bpos[ i ].traders = all_pos;
 --]]
-		end
 	end
 end
 
