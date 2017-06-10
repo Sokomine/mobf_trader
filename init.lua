@@ -36,7 +36,8 @@ dofile(minetest.get_modpath("mobf_trader").."/mob_pickup.lua");    -- pick trade
 dofile(minetest.get_modpath("mobf_trader").."/mob_trading.lua");   -- the actual trading code - complete with formspecs
 dofile(minetest.get_modpath("mobf_trader").."/mob_trading_random.lua");   -- traders with a more random stock
 dofile(minetest.get_modpath("mobf_trader").."/large_chest.lua");   -- one large chest is easier to handle than a collectoin of chests
-dofile(minetest.get_modpath("mobf_trader").."/village_traders.lua");   -- functionality for interaction with mg_villages
+--dofile(minetest.get_modpath("mobf_trader").."/village_traders.lua");   -- functionality for interaction with mg_villages
+dofile(minetest.get_modpath("mobf_trader").."/spawn_mg_villages_traders.lua");   -- functionality for interaction with mg_villages
 dofile(minetest.get_modpath("mobf_trader").."/mob_sitting.lua");   -- allows the mob to sit/lie on furniture
 
 
