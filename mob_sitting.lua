@@ -8,21 +8,22 @@
 
 mob_sitting = {}
 
--- let the entity entity sleep on the bed at position t_pos (rotated according to t_pos.p2 or node.param2)
-mob_sitting.sleep_on_bed = function( self, t_pos )
-	if( not( self ) or not( self.object ) or not( t_pos )) then
+-- let the entity entity sleep on the bed at position t_pos (rotated according to pos.p2 or node.param2)
+mob_sitting.sleep_on_bed = function( self, pos )
+	if( not( self ) or not( self.object ) or not( pos )) then
 		return;
 	end
-	if( not( t_pos.p2 )) then
-		local node = minetest.get_node( t_pos );
+	-- copy target position because we will slightly adjust it
+	local t_pos = {x=pos.x, y=pos.y, z=pos.z, p2 = pos.p2};
+	local param2 = pos.p2;
+	if( not( pos.p2 )) then
+		local node = minetest.get_node( pos );
 		param2 = node.param2;
-	else
-		param2 = t_pos.p2;
 	end
 
 	-- store in the mob data that the mob is sleeping here (else he would be standing
 	-- after next initialization)
-	self.trader_uses = {x=t_pos.x, y=t_pos.y, z=t_pos.z, p2 = t_pos.p2};
+	self.trader_uses = {x=t_pos.x, y=t_pos.y, z=t_pos.z, p2 = param2};
 	self.trader_does = 'sleep';
 
 	local yaw = 0;
@@ -49,6 +50,7 @@ mob_sitting.sleep_on_bed = function( self, t_pos )
 
 	-- set sleep animation
 	mob_sitting.set_animation( self, 'sleep' );
+	return t_pos;
 end
 
 
