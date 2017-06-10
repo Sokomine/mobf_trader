@@ -54,6 +54,12 @@ mob_village_traders.get_full_trader_name = function( data, worker_data )
 		return;
 	end
 	local str = data.first_name;
+	if( data.mob_id ) then
+	   str = "["..data.mob_id.."] "..minetest.pos_to_string( data ).." "..data.first_name;
+	else
+	   str = " -no mob assigned - "..minetest.pos_to_string( data ).." "..data.first_name;
+	end
+
 	if( data.middle_name ) then
 		str = str.." "..data.middle_name..".";
 	end
@@ -64,12 +70,14 @@ mob_village_traders.get_full_trader_name = function( data, worker_data )
 		str = str..", age "..data.age;
 	end
 
-	if(     worker_data and worker_data.title and worker_data.title ~= "" ) then
-		if(     data.generation==2 and data.gender=="m" and worker_data.uniq>1) then
-			str = str..", a "..worker_data.title; --", one of "..tostring( worker_data.uniq ).." "..worker_data.title.."s";
+	if( worker_data and worker_data.title and worker_data.title ~= "" ) then
+		if( data.title and data.title == 'guest' ) then
+			str = str..", a guest staying at "..worker_data.title.." "..worker_data.first_name.."'s house";
+		elseif( data.generation==2 and data.gender=="m" and data.title and data.uniq>1) then
+			str = str..", a "..data.title; --", one of "..tostring( worker_data.uniq ).." "..worker_data.title.."s";
 		-- if there is a job:   , the blacksmith
-		elseif( data.generation==2 and data.gender=="m") then
-			str = str..", the "..worker_data.title;
+		elseif( data.generation==2 and data.gender=="m" and data.title) then
+			str = str..", the "..data.title;
 			-- if there is a job:   , blacksmith Fred's son   etc.
 		elseif( worker_data.uniq>1 ) then
 			str = str..", "..worker_data.title.." "..worker_data.first_name.."'s "..mob_village_traders.get_family_function_str( data );
@@ -85,9 +93,10 @@ end
 
 -- TODO: shed12 and cow_shed are rather for annimals than working sheds
 -- TODO: pastures are for annimals
+-- TODO: show all fields the table beds may contain
 
 -- configure a new inhabitant
--- 	gender	can be "m" or "f"
+-- 	gender		can be "m" or "f"
 --	generation	2 for parent-generation, 1 for children, 3 for grandparents
 --	name_exlcude	names the npc is not allowed to carry (=avoid duplicates)
 --			(not a list but a hash table)
@@ -141,13 +150,25 @@ end
 
 
 -- assign inhabitants to bed positions; create families;
--- bpos needs to contain at least { beds = {list_of_bed_positions}, btye = building_type}
+-- bpos needs to contain at least { beds = {list_of_bed_positions}, btype = building_type}
 -- bpos is the building position data of one building each
 mob_village_traders.assign_mobs_to_beds = function( bpos, house_nr, village_to_add_data_bpos )
 
-	if( not( bpos ) or not( bpos.btype )) then
+	if( not( bpos ) or not( bpos.btype ) or not( bpos.beds)) then
 		return bpos;
 	end
+
+	-- make sure no duplicates exist
+	local check_duplicates = {};
+	local new_table = {};
+	for i,v in ipairs( bpos.beds ) do
+		local str = minetest.pos_to_string( v );
+		if( not(check_duplicates[ str ])) then
+			table.insert( new_table, v );
+		end
+		check_duplicates[ str ] = 1;
+	end
+	bpos.beds = new_table;
 
 	-- workplaces got assigned earlier on
 	local works_at = nil;
@@ -201,10 +222,13 @@ mob_village_traders.assign_mobs_to_beds = function( bpos, house_nr, village_to_a
 			-- lumberjacks do not have families and are all male
 			v = mob_village_traders.get_new_inhabitant( v, "m", 2, worker_names_with_same_profession, nil );
 			-- the first worker in a lumberjack hut can get work assigned and own other plots
-			if( works_at ) then
+			if( works_at and i==1) then
 				v.works_at = works_at;
 				v.title    = title;
 				v.uniq     = not_uniq;
+			else
+				v.title    = 'lumberjack';
+				v.uniq     = 99; -- one of many lumberjacks here
 			end
 			if( owns and #owns>0 ) then
 				v.owns     = owns;
@@ -237,6 +261,12 @@ mob_village_traders.assign_mobs_to_beds = function( bpos, house_nr, village_to_a
 		-- not all houses will have grandparents
 		local grandmother_bed_id = 2+math.random(5);
 		local grandfather_bed_id = 2+math.random(5);
+		-- some houses have guests
+		local guest_id = 99;
+		-- all but the given number are guests
+		if( building_data.guests ) then
+			guest_id = building_data.guests * -1;
+		end
 		-- a child of 18 with a parent of 19 would be...usually impossible unless adopted
 		local oldest_child = 0;
 
@@ -245,11 +275,14 @@ mob_village_traders.assign_mobs_to_beds = function( bpos, house_nr, village_to_a
 			if(     v and v.first_name and v.generation == 3 and v.gender=="f" ) then
 				grandmother_bed_id = i;
 			elseif( v and v.first_name and v.generation == 3 and v.gender=="m" ) then
-				grandfatherm_bed_id = i;
+				grandfather_bed_id = i;
 
 			-- at max 7 npc per house (taverns may have more beds than that)
-			elseif( v and not( v.first_name ) and i<8) then
-				if(     i==grandmother_bed_id ) then
+			elseif( v and not( v.first_name )) then
+				if( i>guest_id ) then
+					v = mob_village_traders.get_new_inhabitant( v, "r", math.random(3), name_exclude, nil ); -- get a random guest
+					v.title = 'guest';
+				elseif( i==grandmother_bed_id ) then
 					v = mob_village_traders.get_new_inhabitant( v, "f", 3, name_exclude, bpos.beds[1].age+18 ); -- get the grandmother
 				elseif( i==grandfather_bed_id ) then
 					v = mob_village_traders.get_new_inhabitant( v, "m", 3, name_exclude, bpos.beds[1].age+18 ); -- get the grandfather
@@ -312,6 +345,7 @@ mob_village_traders.print_house_info = function( village_to_add_data_bpos, house
 		str = str.."provides neither work nor housing.\n";
 
 	else
+		local mobs_need_to_respawn = false;
 
 		str = str.."is inhabitated by:\n";
 		for i,v in ipairs( bpos.beds ) do
@@ -326,6 +360,19 @@ mob_village_traders.print_house_info = function( village_to_add_data_bpos, house
 				else
 					str = str.."\n";
 				end
+
+				if( v.mob_id ) then
+					local self = mob_basics.find_mob_by_id( v.mob_id, 'trader' );
+					if( not( self ) or not( self.object )) then
+						-- TODO: mob missing in action
+						v.mob_id = nil;
+						mobs_need_to_respawn = true;
+					else
+						-- put the mob back on his/her bed
+						mob_sitting.sleep_on_bed( self, v );
+					end
+				end
+
 			end
 		end
 		-- other plots owned
@@ -340,9 +387,11 @@ mob_village_traders.print_house_info = function( village_to_add_data_bpos, house
 			end
 			str = str.."\n";
 		end
+		if( mobs_need_to_respawn ) then
+			mob_village_traders.spawn_traders_for_one_house( bpos, nil, nil );
+		end
 	end
-	print( str );
-	return;
+	return str;
 end
 
 
@@ -356,6 +405,9 @@ mob_village_traders.jobs_in_buildings[ 'tower'      ] = {'guard'};
 mob_village_traders.jobs_in_buildings[ 'school'     ] = {'schoolteacher'};
 mob_village_traders.jobs_in_buildings[ 'library'    ] = {'librarian'};
 mob_village_traders.jobs_in_buildings[ 'tavern'     ] = {'barkeeper'};
+mob_village_traders.jobs_in_buildings[ 'pub'        ] = {'barkeeper'};
+mob_village_traders.jobs_in_buildings[ 'inn'        ] = {'innkeeper'};
+mob_village_traders.jobs_in_buildings[ 'hotel'      ] = {'innkeeper'};
 mob_village_traders.jobs_in_buildings[ 'forge'      ] = {'smith',
 		-- bronzesmith, bladesmith, locksmith etc. may be of little use in our MT worlds;
 		-- the blacksmith is the most common one, followed by the coppersmith
@@ -552,6 +604,64 @@ mob_village_traders.assign_jobs_to_houses = function( village_to_add_data_bpos )
 end
 
 
+mob_village_traders.spawn_traders_for_one_house = function( bpos, minp, maxp )
+	if( not( bpos ) or not( bpos.beds )) then
+		return;
+	end
+	for i,bed in ipairs( bpos.beds ) do
+		-- only for beds that exist, have a mob assigned and fit into minp/maxp
+		if( bed
+		  and bed.first_name
+		  and (not( minp )
+		    or (   bed.x>=minp.x and bed.x<=maxp.x
+		       and bed.y>=minp.y and bed.y<=maxp.y
+		       and bed.z>=minp.z and bed.z<=maxp.z))) then
+
+			if( not( bed.mob_id )) then
+				local trader_typ = bed.title;
+				if( not( trader_typ ) or trader_typ=="" or not( mob_basics.mob_types[ 'trader' ][ trader_typ ])) then
+					trader_typ = 'teacher'; -- TODO: FALLBACK
+				end
+				local self = mob_basics.spawn_mob( bed, trader_typ, nil, nil, nil, nil, true );
+				if( self ) then
+					local prefix = 'trader';
+					bed.mob_id =  self[prefix..'_id'];
+
+					-- select a texture depending on the mob's gender
+					if( bed.gender == "f" ) then
+						self[ prefix..'_texture' ] = "baeuerin.png";
+					else
+						self[ prefix..'_texture' ] = "wheat_farmer_by_addi.png";
+					end
+						self.object:set_properties( { textures = { self[ prefix..'_texture'] }});
+
+					-- children are smaller
+					if( bed.age < 19 ) then
+						local factor = 0.2+bed.age/36;
+						self[ prefix..'_vsize'] = {x=factor, y=factor, z=factor}; -- x,z:width; y: height
+						mob_basics.update_visual_size( self, self[ prefix..'_vsize'], false, prefix );
+					end
+					-- position on bed and set sleeping animation
+					mob_sitting.sleep_on_bed( self, bed );
+					print("SPAWNING TRADER "..trader_typ.." id: "..tostring( bed.mob_id ).." at bed "..minetest.pos_to_string( bed )); -- TODO
+				else
+					print("ERROR: NO TRADER GENERATED FOR "..minetest.pos_to_string( bed ));
+				end
+
+			else
+				local self = mob_basics.find_mob_by_id( bed.mob_id, 'trader' );
+				if( not( self ) or not( self.object )) then
+					print("ERROR: TRADER "..tostring( bed.mob_id ).." got lost!");
+				else
+					-- put the mob back on his/her bed
+					mob_sitting.sleep_on_bed( self, bed );
+				end
+			end
+		end
+	end
+end
+
+
 -- spawn traders in villages
 mob_village_traders.part_of_village_spawned = function( village, minp, maxp, data, param2_data, a, cid )
 	-- if mobf_trader is not installed, we can't spawn any mobs;
@@ -571,15 +681,11 @@ mob_village_traders.part_of_village_spawned = function( village, minp, maxp, dat
 	-- for each building in the village
 	for house_nr,bpos in ipairs(village.to_add_data.bpos) do
 
-		-- only handle buildings that are at least partly contained in that part of the
-		-- village that got spawned in this mapchunk
-		-- if further parts of the house spawn in diffrent mapchunks, the new beds will be
-		-- checked and populated with further inhabitants
-		if( not(  bpos.x > maxp.x or bpos.x + bpos.bsizex < minp.x
-		       or bpos.z > maxp.z or bpos.z + bpos.bsizez < minp.z )) then
+		bpos = mob_village_traders.assign_mobs_to_beds( bpos, house_nr, village.to_add_data.bpos );
 
-			bpos = mob_village_traders.assign_mobs_to_beds( bpos, house_nr, village.to_add_data.bpos );
-		end
+		mob_village_traders.spawn_traders_for_one_house( bpos, minp, maxp );
+	end
+
 --[[
 		   -- avoid spawning them twice
 		   and not( bpos.traders )) then
@@ -600,8 +706,8 @@ print("ASSIGNING TO "..tostring(building_data.typ).." WITH beds "..minetest.seri
 			-- store the information about the spawned traders
 			village.to_add_data.bpos[ i ].traders = all_pos;
 --]]
-	end
 end
+
 
 
 mob_village_traders.choose_traders = function( village_type, building_type, replacements )
@@ -813,7 +919,7 @@ minetest.register_chatcommand( 'inhabitants', {
 				minetest.chat_send_player( name, "Printing information about inhabitants of village no. "..tostring( v.nr )..", called "..( tostring( v.name or 'unknown')).." to console.");
 				-- actually print it
 				for house_nr = 1,#v.to_add_data.bpos do
-					mob_village_traders.print_house_info( v.to_add_data.bpos, house_nr );
+					print( mob_village_traders.print_house_info( v.to_add_data.bpos, house_nr ));
 				end
 				return;
 			end
