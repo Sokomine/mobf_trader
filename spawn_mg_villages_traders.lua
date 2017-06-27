@@ -1,7 +1,7 @@
 
 -- interface function for mg_villages;
 -- the table "bed" contains all necessary information about the mob
-mobf_trader.spawn_one_trader = function( bed )
+mobf_trader.spawn_one_trader = function( bed, village_id, plot_nr, bed_nr, bpos )
 	local prefix = 'trader';
 
 	-- does the mob exist already?
@@ -10,7 +10,15 @@ mobf_trader.spawn_one_trader = function( bed )
 		local self = mob_basics.find_mob_by_id( bed.mob_id, 'trader' );
 		if( self and self.object ) then
 			-- make sure he sleeps on his assigned bed
-			mob_sitting.sleep_on_bed( self, bed );
+			--mob_world_interaction.sleep_on_bed( self, bed );
+
+			local pos_in_front_of_house = handle_schematics.get_pos_in_front_of_house( bpos, bed_nr );
+			pos_in_front_of_house.y = pos_in_front_of_house.y + 1.5;
+			self.object:setpos( pos_in_front_of_house );
+			self.object:setyaw( math.rad( pos_in_front_of_house.yaw ));
+			mob_basics.update_texture( self, 'trader', nil );
+			mob_world_interaction.set_animation( self, 'stand' );
+
 			-- return the id of the mob
 			return bed.mob_id;
 		end
@@ -46,7 +54,16 @@ mobf_trader.spawn_one_trader = function( bed )
 		mob_basics.update_visual_size( self, self[ prefix..'_vsize'], false, prefix );
 	end
 	-- position on bed and set sleeping animation
-	mob_sitting.sleep_on_bed( self, bed );
+	--mob_world_interaction.sleep_on_bed( self, bed );
+
+	-- place in front of the house
+	local pos_in_front_of_house = handle_schematics.get_pos_in_front_of_house( bpos, bed_nr );
+	pos_in_front_of_house.y = pos_in_front_of_house.y + 1.5;
+	self.object:setpos( pos_in_front_of_house );
+	self.object:setyaw( math.rad( pos_in_front_of_house.yaw ));
+	mob_basics.update_texture( self, 'trader', nil );
+	mob_world_interaction.set_animation( self, 'stand' );
+
 	--print("SPAWNING TRADER "..trader_typ.." id: "..tostring( bed.mob_id ).." at bed "..minetest.pos_to_string( bed )); -- TODO
 	return bed.mob_id;
 end

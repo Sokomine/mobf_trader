@@ -369,7 +369,7 @@ mob_village_traders.print_house_info = function( village_to_add_data_bpos, house
 						mobs_need_to_respawn = true;
 					else
 						-- put the mob back on his/her bed
-						mob_sitting.sleep_on_bed( self, v );
+						mob_world_interaction.sleep_on_bed( self, v );
 					end
 				end
 
@@ -642,7 +642,7 @@ mob_village_traders.spawn_traders_for_one_house = function( bpos, minp, maxp )
 						mob_basics.update_visual_size( self, self[ prefix..'_vsize'], false, prefix );
 					end
 					-- position on bed and set sleeping animation
-					mob_sitting.sleep_on_bed( self, bed );
+					mob_world_interaction.sleep_on_bed( self, bed );
 					print("SPAWNING TRADER "..trader_typ.." id: "..tostring( bed.mob_id ).." at bed "..minetest.pos_to_string( bed )); -- TODO
 				else
 					print("ERROR: NO TRADER GENERATED FOR "..minetest.pos_to_string( bed ));
@@ -654,7 +654,7 @@ mob_village_traders.spawn_traders_for_one_house = function( bpos, minp, maxp )
 					print("ERROR: TRADER "..tostring( bed.mob_id ).." got lost!");
 				else
 					-- put the mob back on his/her bed
-					mob_sitting.sleep_on_bed( self, bed );
+					mob_world_interaction.sleep_on_bed( self, bed );
 				end
 			end
 		end

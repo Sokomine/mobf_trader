@@ -38,8 +38,8 @@ dofile(minetest.get_modpath("mobf_trader").."/mob_trading_random.lua");   -- tra
 dofile(minetest.get_modpath("mobf_trader").."/large_chest.lua");   -- one large chest is easier to handle than a collectoin of chests
 --dofile(minetest.get_modpath("mobf_trader").."/village_traders.lua");   -- functionality for interaction with mg_villages
 dofile(minetest.get_modpath("mobf_trader").."/spawn_mg_villages_traders.lua");   -- functionality for interaction with mg_villages
-dofile(minetest.get_modpath("mobf_trader").."/mob_sitting.lua");   -- allows the mob to sit/lie on furniture
-
+--dofile(minetest.get_modpath("mobf_trader").."/mob_sitting.lua");   -- allows the mob to sit/lie on furniture
+movement = dofile(minetest.get_modpath("mobf_trader").."/movement.lua");      -- TODO: copied from npcf
 
 -- find out the right mesh; if the wrong one is used, the traders become invisible
 mobf_trader.mesh = "character.b3d";
@@ -121,6 +121,15 @@ mobf_trader.trader_entity_prototype = {
         decription = "Default NPC",
         inventory_image = "npcf_inv_top.png",
 
+	-- TODO: taken from npcf
+	timer = 0,
+	on_step = function(self, dtime)
+		self.timer = self.timer + dtime
+		if self._mvobj then
+			self._mvobj:_do_movement_step(dtime)
+		end
+	end,
+
 
 	-- Information that is specific to this particular trader
 	get_staticdata = function(self)
@@ -164,8 +173,70 @@ mobf_trader.trader_entity_prototype = {
 			minetest.chat_send_player( puncher:get_player_name(),
 				( self.trader_name or 'A trader' )..': '..
 				'Hey! Stop doing that. I am a peaceful trader. Here, buy something:');
+
+			if( self.trader_does == 'sleep' and self.trader_uses and self.trader_uses.x ) then
+				local p_next_to_bed = mob_world_interaction.find_place_next_to( self.trader_uses, 0, {x=0,y=0,z=0});
+				if( not(p_next_to_bed )) then
+					minetst.chat_send_player( puncher:get_player_name(), "Sorry. No place to stand.");
+					return;
+				end
+				-- find out which village we are in
+				local village_id = mg_villages.get_town_id_at_pos( p_next_to_bed );
+			        if( not( village_id )) then
+					minetst.chat_send_player( puncher:get_player_name(), "Error: I am outside of a village.");
+					return;
+				end
+				-- find out which plot we are on
+				local plot_nr = nil;
+				for nr, p in ipairs( mg_villages.all_villages[ village_id ].to_add_data.bpos ) do
+					if(   p.x <= p_next_to_bed.x and (p.x + p.bsizex) >= p_next_to_bed.x
+					  and p.z <= p_next_to_bed.z and (p.z + p.bsizez) >= p_next_to_bed.z) then
+						plot_nr = nr;
+					end
+				end
+				if( not( plot_nr )) then
+					minetst.chat_send_player( puncher:get_player_name(), "Error: I am not on any particular plot.");
+					return;
+				end
+				-- find out which bed is ours
+				local bed_nr = nil;
+				for i, bed in ipairs( mg_villages.all_villages[ village_id ].to_add_data.bpos[ plot_nr ].beds ) do
+					if( bed.mob_id and bed.mob_id == self.trader_id ) then
+						bed_nr = i;
+					end
+				end
+				if( not( bed_nr )) then
+					minetest.chat_send_player( puncher:get_player_name(), "Error: I do not know which number my bed has.");
+					return;
+				end
+
+				-- find out where the front of the house is
+				local bpos = mg_villages.all_villages[ village_id ].to_add_data.bpos[ plot_nr ];
+				-- each mob gets its own place in front of the house
+				local p_in_front = handle_schematics.get_pos_in_front_of_house( bpos, bed_nr - 1 );
+				if( not( p_in_front )) then
+					minetst.chat_send_player( puncher:get_player_name(), "Error: Front of house not found.");
+					return;
+				end
+
+				-- teleport to the position next to the bed
+				self.object:setpos( {x=p_next_to_bed.x, y=p_next_to_bed.y+1,z=p_next_to_bed.z} );
+				-- set stand-animation
+				mob_world_interaction.set_animation( self, 'stand' );
+				-- the trader is no longer sleeping in his bed
+				self.trader_uses = nil;
+				self.trader_does = 'stand';
+
+				minetest.chat_send_player( puncher:get_player_name(), "Good morning! I will take a look outside.");
+				local move_obj = movement.getControl(self);
+				move_obj:walk( p_in_front, 1, {find_path == true});
+			else
+				print("My current path is: "..minetest.serialize( self._path ));
+			end
+
+
 			-- marketing - if *that* doesn't disencourage aggressive players... :-)
-			mobf_trader.trader_entity_trade( self, puncher );
+--TODO			mobf_trader.trader_entity_trade( self, puncher );
 		end
 	end,
 
@@ -260,8 +331,8 @@ mobf_trader.trader_entity_on_activate = function(self, staticdata, dtime_s)
 
 
 		if( self.trader_does == 'sleep' and self.trader_uses and self.trader_uses.x ) then
-			mob_sitting.sleep_on_bed( self, self.trader_uses );
-		else -- default: stand
+			mob_world_interaction.sleep_on_bed( self, self.trader_uses );
+		elseif(  self.trader_animation ) then -- default: stand
 			-- the mob will do nothing but stand around
 			self.object:set_animation({x=self.animation[ self.trader_animation..'_START'], y=self.animation[ self.trader_animation..'_END']},
 				self.animation_speed-5+math.random(10));
