@@ -205,6 +205,23 @@ function mvobj_proto:walk(pos, speed, param)
 	end
 end
 
+-- like mvobj_proto:walk, except that in this case the path has already been
+-- calculated and is passed as a parameter to the function
+function mvobj_proto:walk_path(path, speed, param)
+	if( not( path ) or #path<1 ) then
+		return;
+	end
+	if param then
+		self:set_walk_parameter(param)
+	end
+	self._target_pos_bak = self.target_pos
+	self.target_pos = path[ #path ];
+	self.speed = speed
+	self._path = path;
+	self._walk_started = true
+end
+
+
 -- do a walking step
 function mvobj_proto:_do_movement_step(dtime)
 	-- step timing / initialization check
@@ -246,12 +263,29 @@ function mvobj_proto:_do_movement_step(dtime)
 				if self._path[2] then
 
 
-local new_pos = {x=self._path[1].x, y=self.pos.y, z=self._path[1].z};
-self.pos = new_pos;
-self._npc.object:setpos(new_pos);
-self.yaw = trader_npcf:get_face_direction(new_pos, self._path[2])
+					local new_pos = {x=self._path[1].x, y=self.pos.y, z=self._path[1].z};
+					self.pos = new_pos;
+					self._npc.object:setpos(new_pos);
+					self.yaw = trader_npcf:get_face_direction(new_pos, self._path[2])
 
-minetest.chat_send_player("singleplayer","Next target: "..minetest.pos_to_string( self._path[2] ).." Steps left: "..table.getn( self._path ));
+					-- TODO: remove all these debug messages later on
+					minetest.chat_send_player("singleplayer","Next target: "..minetest.pos_to_string( self._path[2] ).." Steps left: "..table.getn( self._path ));
+
+					local target_node = minetest.get_node( self._path[2] );
+					minetest.chat_send_player("singleplayer","target node: "..minetest.serialize( target_node ).. " can get through: "..tostring( mob_world_interaction.can_get_through[ target_node.name ]));
+					-- is the target a bed? then sleep in it instead of trying to move there
+					if( target_node and target_node.name and mob_world_interaction.can_get_through[ target_node.name ]==2) then
+						minetest.chat_send_player("singleplayer","sleeping...");
+						local p = {x=self._path[2].x, y=self._path[2].y, z=self._path[2].z, p2 = target_node.param2 };
+						mob_world_interaction.sleep_on_bed( self._npc, p );
+						self._walk_started = false;
+						self._path = nil;
+						self.speed = 0;
+						self._state = "sleep";
+						trader_npcf:set_animation(self._npc, self._state);
+						-- path has been completed
+						return;
+					end
 					table.remove(self._path, 1)
 					self._walk_started = true
 				else
@@ -313,7 +347,7 @@ minetest.chat_send_player("singleplayer","Next target: "..minetest.pos_to_string
 			-- do not jump when standing inside a door, gate or similar node
 			mob_world_interaction.door_type[node[0].name] == nil then
 		-- jump if in catched in walkable node
-		self.velocity.y = 3
+		self.velocity.y = 2
 	else
 		-- the mob is standing inside a (closed) door; open it
 		if( self._path and self._path[1] ) then
@@ -402,20 +436,20 @@ function mvobj_proto:check_for_stuck()
 			end
 			self:teleport(teleport_dest)
 		else
-minetest.chat_send_player("singleplayer","NPC got stuck at "..minetest.serialize( self.pos ).." Target: "..minetest.pos_to_string(self._path[1]));
+			-- TODO: remove these debug messages again later
+			minetest.chat_send_player("singleplayer","NPC got stuck at "..minetest.serialize( self.pos ).." Target: "..minetest.pos_to_string(self._path[1]));
 
-local new_pos = {x=math.floor( self.pos.x ), y=math.floor(self.pos.y), z=math.floor( self.pos.z )};
-local node = minetest.get_node( new_pos );
-new_pos.y = new_pos.y + 0.5;
-if( not( node ) or not( node.name ) or mob_world_interaction.walkable( node )) then
-minetest.chat_send_player("singleplayer","CANNOT walk inside "..minetest.pos_to_string( new_pos ));
-	self:stay();
-end
-self.pos = new_pos
-self._npc.object:setpos(new_pos);
-self.yaw = trader_npcf:get_face_direction(new_pos, self._path[1])
-
---self:stay();
+			local new_pos = {x=math.floor( self.pos.x ), y=math.floor(self.pos.y), z=math.floor( self.pos.z )};
+			local node = minetest.get_node( new_pos );
+			new_pos.y = new_pos.y + 1.1;
+			if( not( node ) or not( node.name ) or mob_world_interaction.walkable( node )) then
+				minetest.chat_send_player("singleplayer","CANNOT walk inside "..minetest.pos_to_string( new_pos ));
+			end
+			-- try to get free: jump a bit
+			self.velocity.y = 2
+			self.pos = new_pos
+			self._npc.object:setpos(new_pos);
+			self.yaw = trader_npcf:get_face_direction(new_pos, self._path[1])
 --			self:stay()
 		end
 	elseif self.target_pos then
