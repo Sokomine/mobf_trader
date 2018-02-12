@@ -276,10 +276,10 @@ mob_trading.show_trader_formspec = function( self, player, menu_path, fields, tr
 		             'label[6.5,'..(0.5+m_up)..';'..minetest.formspec_escape( greeting3 )..']'..
 		             'label[0.2,'..(1.5+m_up)..';Goods:]';
 
-	-- the owner and people with the mop_pickup priv can pick the trader up
+	-- the owner and people with the mob_pickup priv can pick the trader up
 	-- (he will end up in the inventory and can then be placed elsewhere)
 	if( (self.trader_owner and self.trader_owner == pname)
-	  or minetest.check_player_privs( pname, {mop_pickup=true})) then
+	  or minetest.check_player_privs( pname, {mob_pickup=true})) then
 
 		formspec = formspec..'button_exit[9,0.5;1,0.5;'..npc_id..'_take;Take]';
 	end
