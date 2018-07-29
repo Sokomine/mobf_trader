@@ -1315,8 +1315,8 @@ mob_trading.move_trade_goods = function( source_inv, target_inv, stack, player, 
 			    and (leftover:get_count() >= remaining_stack:get_count())) then
 
 				-- find a place between player and trader so that the player can see the items falling down; slightly elevated
-				local p1 = player:getpos();
-				local p2 = self.object:getpos();
+				local p1 = player:get_pos();
+				local p2 = self.object:get_pos();
 				local p3 = {x=p1.x-((p1.x-p2.x)/2), y=p1.y-((p1.y-p2.y)/2)+1.0, z=p1.z-((p1.z-p2.z)/2)};
 
 				-- tell the player to take a look
@@ -1349,7 +1349,7 @@ mob_trading.find_trader_inv = function( self )
 		return nil;
 	end
 	local RANGE = mob_trading.LOCKED_CHEST_SEARCH_RANGE;
-	local tpos = self.object:getpos(); -- current position of the trader
+	local tpos = self.object:get_pos(); -- current position of the trader
 	-- search for locked chest from default, locks mod and technic mod chests
 	-- ignore technic mithril chests as those are not locked
 	local chest_list = minetest.find_nodes_in_area(
@@ -1501,7 +1501,7 @@ mob_trading.do_trade = function( self, player, menu_path, trade_details, counted
 				' gets '..minetest.serialize(   trade_details[ 1 ])..
 				' for ' ..minetest.serialize(   trade_details[ choice2 ])..
 				' from '..tostring(             self.trader_id )..
-				' at '..minetest.pos_to_string( self.object:getpos() )..
+				' at '..minetest.pos_to_string( self.object:get_pos() )..
 				' (owned by '..tostring(        self.trader_owner )..')'..
 				' typ:'..tostring(              self.trader_typ or '?' )..'.');
 
