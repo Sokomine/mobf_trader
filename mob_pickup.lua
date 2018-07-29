@@ -231,7 +231,7 @@ mob_pickup.place_mob = function( itemstack, placer, pointed_thing, prefix, entit
 	end
 
 
-	local pos  = minetest.get_pointed_thing_position( pointed_thing, above );
+	local pos  = minetest.get_pointed_thing_position( pointed_thing, false );
 
 	-- does this particular mob want to be placed there?
 	local deny = mob_pickup.deny_place[ entity_name ];

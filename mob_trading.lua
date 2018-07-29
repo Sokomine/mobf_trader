@@ -1103,7 +1103,7 @@ mob_trading.can_trade = function( price_stack_str, debtor_name, debtor_inv, rece
 		return { error_msg = nil, price_desc = price_desc, price_stacks = price_stacks, price_types = price_types };
 	end
 	
-	price_stack = ItemStack( price_stack_str );
+	local price_stack = ItemStack( price_stack_str );
 	-- get information about the price
 	local price_desc        = '';
 	local price_stack_name  = price_stack:get_name();
@@ -1308,7 +1308,7 @@ mob_trading.move_trade_goods = function( source_inv, target_inv, stack, player, 
 		while( not( remaining_stack:is_empty() )) do
 
 			-- add as many as possible in one go
-			leftover = target_inv:add_item( 'main', remaining_stack );
+			local leftover = target_inv:add_item( 'main', remaining_stack );
 
 			-- in case nothing was added to target_inv: an error occoured (i.e. target_inv full)
 			if( not( leftover:is_empty())
