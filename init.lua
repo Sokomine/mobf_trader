@@ -62,7 +62,7 @@ mobf_trader.trader_entity_prototype = {
 
 	-- so far, this is more or less the redefinition of the standard player model
 	physical     = true,
-	collisionbox = {-0.30,-1.0,-0.30, 0.30,0.8,0.30},
+	collisionbox = {-0.30, 0.0,-0.30, 0.30,1.8,0.30},
 
 	visual       = "mesh";
 	visual_size  = {x=1, y=1, z=1},
