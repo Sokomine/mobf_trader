@@ -99,7 +99,7 @@ mob_pickup.log = function( msg, self, prefix )
                         ' typ:'..tostring(              self[ prefix..'_typ'] or '?' )..
                         ' prefix:'..tostring(           prefix or '?' )..
                         ' at:'..minetest.pos_to_string( self.object:get_pos() )..
-                        ' by:'..tostring(               self[ prefix..'_owner'] )..'.');
+                        ' owner:'..tostring(            self[ prefix..'_owner'] or '-no owner-')..'.');
         end
 end
 -----------------------------------------------------------------------------------------------------
