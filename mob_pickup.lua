@@ -35,7 +35,7 @@ mob_pickup.deny_place  = {}
 -- We need to know something about the mobs and their corresponding items
 -----------------------------------------------------------------------------------------------------
 -- the "functions" parameter may contain the deny_* functions
-mob_pickup.register_mob_for_pickup = function( entity_name, item_name, data )
+mob_pickup.register_mob_for_pickup = function( entity_name, item_name, prefix, data )
 	if( not( entity_name ) or not( item_name )) then
 		return false;
 	end
@@ -43,6 +43,21 @@ mob_pickup.register_mob_for_pickup = function( entity_name, item_name, data )
 	if( mob_pickup.entity_to_object_name[ entity_name ] ) then
 		return false;
 	end
+	-- the craftitem (the "egg" in other mods) has to be registered already
+	if( not(minetest.registered_craftitems[ item_name ])) then
+		return false
+	end
+
+	-- change the craftitem so that the mob can be picked up
+	minetest.override_item( item_name, {
+		on_place = function( itemstack, placer, pointed_thing )
+				return mob_pickup.place_mob( itemstack, placer, pointed_thing,
+					prefix, entity_name, true );
+			   end,
+		-- carries individual metadata - stacking would interfere with that
+		stack_max = 1,
+	})
+
 	-- store which item the player will get when picking up the mob
 	mob_pickup.entity_to_object_name[ entity_name ] = item_name;
 
@@ -91,6 +106,14 @@ end
 -- pick the mob up and store in the players inventory;
 -----------------------------------------------------------------------------------------------------
 -- the mob's data will be saved and he can be placed at another location
+-- The mob needs to have these properties (in staticdata):
+--      prefix..'_name'
+--      prefix..'_id'
+--      prefix..'_typ'
+--      prefix..'_owner' (optional; but then only for those with mob_pickup priv)
+-- mob_pickup.register_mob_for_pickup( entity_name, item_name, data ) needs to have been
+--      called once before so that the mob (and its inventory object) are known
+-- calls mob_basics.forget_mob(..)
 -- NOTE: only mobs which are owned by the player can be picked up (unless the player has the mob_pickup priv)
 mob_pickup.pick_mob_up = function( self, player, menu_path, prefix, is_personalized, stored_data )
 

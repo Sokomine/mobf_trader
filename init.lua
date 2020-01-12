@@ -343,16 +343,11 @@ minetest.register_craftitem("mobf_trader:trader_item", {
 	inventory_image = "character.png",
 	wield_image     = "character.png",
 	wield_scale     = {x=1,y=1,z=1},
-	on_place        = function( itemstack, placer, pointed_thing )
-				return mob_pickup.place_mob( itemstack, placer, pointed_thing, 'trader', 'mobf_trader:trader', true );
-			  end,
-	-- carries individual metadata - stacking would interfere with that
-	stack_max = 1,
-	
+	-- Note: on_place and stack_max are now set in mob_pickup.register_mob_for_pickup automaticly
 })
 
 
-mob_pickup.register_mob_for_pickup( 'mobf_trader:trader', 'mobf_trader:trader_item', {
+mob_pickup.register_mob_for_pickup( 'mobf_trader:trader', 'mobf_trader:trader_item', 'trader', {
 	deny_pickup = function( self, player )
 
 		if( not( self )) then
