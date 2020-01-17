@@ -388,6 +388,12 @@ mob_pickup.register_mob_for_pickup( 'mobf_trader:trader', 'mobf_trader:trader_it
 	pickup_success_msg = 'Mob picked up. In order to use him again, just wield him and place him somewhere.',
 
 	place_success_msg  = 'Trader placed and waiting for trades.',
+
+	create_description = function(self)
+		return "Trader "..(self.trader_name or "Nameless")..
+			" ("..string.upper( string.sub( self.trader_typ or "", 1, 1 ) )..
+			      string.sub( self.trader_typ or "?", 2 )..")"
+	end,
 });
 
 

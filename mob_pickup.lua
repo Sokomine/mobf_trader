@@ -20,6 +20,9 @@ mob_pickup.pickup_success_msg = {}
 
 mob_pickup.place_success_msg = {}
 
+-- update the description of the inventory item of that particular mob that has been picked up
+mob_pickup.create_description = {}
+
 -- this can hold functions (in a table) which deny the pickup of a mob; structure:
 --    key:   entity name
 --    value: function( self, player ) that gets an entity as parameter, returns '' on success; returns error message on failure
@@ -82,6 +85,10 @@ mob_pickup.register_mob_for_pickup = function( entity_name, item_name, prefix, d
 	else
 		mob_pickup.place_success_msg[ entity_name  ] = 
 			'Mob placed.';
+	end
+
+	if( data and data.create_description ) then
+		mob_pickup.create_description[ entity_name ] = data.create_description
 	end
 end
 
@@ -187,6 +194,16 @@ mob_pickup.pick_mob_up = function( self, player, menu_path, prefix, is_personali
 	item[ "metadata" ]   = staticdata;
 	-- save the changed table
 	mob_as_item:replace( item );
+	local m = mob_as_item:get_meta();
+	local descr_function = mob_pickup.create_description[ self.name ]
+	if( descr_function ) then
+		m:set_string( "description", descr_function( self ))
+	else
+		local mname = staticdata_table[ prefix..'_name'] or '-nameless-';
+		m:set_string( "description",
+			string.upper( string.sub( prefix, 1, 1 ) )..string.sub( prefix, 2 ).." "..
+			string.upper( string.sub( mname, 1, 1 ) )..string.sub( mname, 2 ))
+	end
 
 	if( stored_data ) then
 		minetest.chat_send_player( pname,
