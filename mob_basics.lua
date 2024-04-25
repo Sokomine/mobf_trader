@@ -728,7 +728,7 @@ mob_basics.mob_list_formspec = function( player, formname, fields )
 				col        = 0;
 				minetest.chat_send_player( pname, 'You do not have the teleport priv. Please walk there manually.');
 			elseif( mpos and mpos.x and mpos.y and mpos.z ) then
-				player:moveto( mpos, false ); -- teleport the player to the mob
+				player:move_to( mpos, false ); -- teleport the player to the mob
 				-- TODO: check if the mob is there; if not: restore it
 				return;
 			end
