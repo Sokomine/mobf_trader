@@ -266,14 +266,15 @@ mob_trading.show_trader_formspec = function( self, player, menu_path, fields, tr
 	else
 		greeting3 = 'I work for myself.';
 	end
+	greeting1 = greeting1.." "..greeting3
 
 	if( menu_path and menu_path[1] ) then
 	      formspec = formspec..'button[4.5,6.3;2,0.5;'..npc_id..'_main;Show goods]';
 	end
 
-	formspec = formspec..'label[0.5,'..(0.5+m_up)..';'..minetest.formspec_escape( greeting1 )..']'..
-		             'label[3.5,'..(0.5+m_up)..';'..minetest.formspec_escape( greeting2 )..']'..
-		             'label[6.5,'..(0.5+m_up)..';'..minetest.formspec_escape( greeting3 )..']'..
+	formspec = formspec..'label[0.5,'..(0.0+m_up)..';'..minetest.formspec_escape( greeting1 )..']'..
+		             'label[0.5,'..(0.5+m_up)..';'..minetest.formspec_escape( greeting2 )..']'..
+--		             'label[6.5,'..(0.5+m_up)..';'..minetest.formspec_escape( greeting3 )..']'..
 		             'label[0.2,'..(1.5+m_up)..';Goods:]';
 
 	-- the owner and people with the mob_pickup priv can pick the trader up
