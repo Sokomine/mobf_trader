@@ -84,6 +84,9 @@ mob_basics.restore_data = function()
 	if( file ) then
 		local data = file:read("*all");
 		mob_basics.known_mobs = minetest.deserialize( data );
+		if(not(mob_basics.known_mobs)) then
+			mob_basics.known_mobs = {}
+		end
 		file:close();
 
 		-- this is also a good time to create a list of all mobs which is used for /moblist
